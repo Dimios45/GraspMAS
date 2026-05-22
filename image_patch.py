@@ -3,8 +3,7 @@ from matplotlib import pyplot as plt
 import base64
 import os
 import numpy as np
-from openai import OpenAI
-from openai.types import CreateEmbeddingResponse
+from local_vlm import vlm_chat, EMBED_MODEL
 import requests
 import torch
 import torchvision
@@ -29,17 +28,16 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 BOX_TRESHOLD = 0.35
 TEXT_TRESHOLD = 0.25
 THRESHOLD = 0.4
-detector_id = 'IDEA-Research/grounding-dino-tiny'
-# detector_id = 'IDEA-Research/grounding-dino-base'
+detector_id = '/mnt/data/mritunjoyh/models/grounding-dino-tiny'
 object_detector = pipeline(model=detector_id, task="zero-shot-object-detection", device=device)
 
 ## OWL-V2 model
-owl_processor = Owlv2Processor.from_pretrained("google/owlv2-base-patch16-ensemble")
-owl_model = Owlv2ForObjectDetection.from_pretrained("google/owlv2-base-patch16-ensemble")
+owl_processor = Owlv2Processor.from_pretrained("/mnt/data/mritunjoyh/models/owlv2-base-patch16-ensemble")
+owl_model = Owlv2ForObjectDetection.from_pretrained("/mnt/data/mritunjoyh/models/owlv2-base-patch16-ensemble")
 
 
 ## SAM model
-segmenter_id = "facebook/sam-vit-base"
+segmenter_id = "/mnt/data/mritunjoyh/models/sam-vit-base"
 segmentator = AutoModelForMaskGeneration.from_pretrained(segmenter_id).to(device)
 segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
 
@@ -51,20 +49,13 @@ vlpart.to(device=device)
 THRESHOLD_VLPART = 0.3
 
 ## BLIP2 model
-blip_processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl")
+blip_processor = Blip2Processor.from_pretrained("/mnt/data/mritunjoyh/models/blip2-flan-t5-xl")
 blip_model = Blip2ForConditionalGeneration.from_pretrained(
-    "Salesforce/blip2-flan-t5-xl",torch_dtype=torch.bfloat16
+    "/mnt/data/mritunjoyh/models/blip2-flan-t5-xl", torch_dtype=torch.bfloat16
 ).to(device)
 
-## OpenAI API
-api_file = os.path.join(BASE_PATH, 'api.key')
-with open(api_file) as f:
-    api_key = f.readline().splitlines()
-OPENAI_CLIENT = OpenAI(api_key=api_key[0]) # , base_url="https://api.deepseek.com"
-EMBEDDING_MODEL = "text-embedding-ada-002"
-
 ## MiDAS model
-depth_id = "Intel/dpt-hybrid-midas"
+depth_id = "/mnt/data/mritunjoyh/models/dpt-hybrid-midas"
 depth_processor = DPTImageProcessor.from_pretrained(depth_id)
 depth_model = DPTForDepthEstimation.from_pretrained(depth_id, low_cpu_mem_usage=True)
 
@@ -341,30 +332,15 @@ class ImagePatch:
         with open(self.query_image_path, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-        response = OPENAI_CLIENT.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}",
-                                        "detail": "low",
-                            },
-                        },
-                    ],
-                }
+        response_message = vlm_chat([{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}},
             ],
-        )
+        }], max_new_tokens=5)
 
-        response_message = response.choices[0].message.content
-
-        if response_message == 'Y':
+        if 'Y' in response_message.upper():
             out= True
         else:
             out= False
@@ -388,30 +364,15 @@ class ImagePatch:
         # generated_ids = blip_model.generate(**inputs)
         # generated_text = blip_processor.batch_decode(generated_ids[0], skip_special_tokens=True)
 
-        ## GPT-4o-mini
         with open(self.query_image_path, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        response = OPENAI_CLIENT.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}",
-                                        "detail": "low",
-                            },
-                        },
-                    ],
-                }
+        answer = vlm_chat([{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}},
             ],
-        )
-        answer = response.choices[0].message.content
+        }], max_new_tokens=10)
         if 'yes' in answer.lower():
             out= True
         else:
@@ -434,40 +395,16 @@ class ImagePatch:
 #         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
 #         return generated_text
 
-        ### GPT-4o-mini
         with open(self.query_image_path, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-        headers = {
-          "Content-Type": "application/json",
-          "Authorization": f"Bearer {OPENAI_CLIENT.api_key}"
-        }
-
-        payload = {
-          "model": "gpt-4o-mini",
-          "messages": [
-            {
-              "role": "user",
-              "content": [
-                {
-                  "type": "text",
-                  "text": prompt
-                },
-                {
-                  "type": "image_url",
-                  "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}",
-                    "detail": "low"
-                  }
-                }
-              ]
-            }
-          ],
-          "max_tokens": 300
-        }
-
-        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-        response_message = response.json()["choices"][0]["message"]["content"]
+        response_message = vlm_chat([{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}},
+            ],
+        }], max_new_tokens=300)
         return response_message
 
     def best_image_match(self, list_patches: list[ImagePatch], content: list[str], return_index: bool = False) -> \
@@ -490,19 +427,17 @@ class ImagePatch:
         if len(list_patches) == 0:
             return None
 
-        patch_embeddings: list[CreateEmbeddingResponse] = []
+        patch_embeddings = []
         for patch in list_patches:
             inputs = blip_processor(images=patch.PIL_img, return_tensors="pt").to(device="cuda", dtype=torch.bfloat16)
             generated_ids = blip_model.generate(**inputs)
             generated_text = blip_processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-            ## convert generated_text to embedding
-            response = OPENAI_CLIENT.embeddings.create(model=EMBEDDING_MODEL, input=generated_text)
-            patch_embeddings.append(response)
+            patch_embeddings.append(EMBED_MODEL.encode(generated_text))
 
         scores = torch.zeros(len(patch_embeddings))
         for cont in content:
-            query_embedding = OPENAI_CLIENT.embeddings.create(model=EMBEDDING_MODEL, input=cont)
-            relatedness = [relatedness_fn(query_embedding.data[0].embedding, embed.data[0].embedding) for embed in patch_embeddings]
+            query_embedding = EMBED_MODEL.encode(cont)
+            relatedness = [relatedness_fn(query_embedding, embed) for embed in patch_embeddings]
             scores += torch.tensor(relatedness)
         scores = scores / len(content)
 
@@ -573,30 +508,13 @@ class ImagePatch:
         with open(self.query_image_path, "rb") as image_file:
             base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-        response = OPENAI_CLIENT.chat.completions.create(
-          model="gpt-4o",
-          messages=[
-            {
-              "role": "user",
-              "content": [
-                {
-                  "type": "text",
-                  "text": question,
-                },
-                {
-                  "type": "image_url",
-                  "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}",
-                    "detail": "high"
-                  }
-                }
-              ]
-            }
-          ],
-          max_tokens=300,
-        )
-
-        response_message = response.choices[0].message.content
+        response_message = vlm_chat([{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": question},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "high"}},
+            ],
+        }], max_new_tokens=300)
         return response_message
 
     def bool_to_yesno(self, bool_answer: bool) -> str:

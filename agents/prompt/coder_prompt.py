@@ -8,6 +8,8 @@ Ensure your code follow the plan.
 2. Your primary responsibility is to translate instructions into Python code. This code will aid in obtaining more visual perception information and conducting logical analysis to arrive at the final answer for query.
 3. Image patch is a crop of an image centered around a particular object.
 4. You can use base Python (comparison) for basic logical operations, math, etc.
+5. ONLY call methods that exist in the ImagePatch class above. Never invent or call functions not listed there (e.g. adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses do NOT exist).
+6. grasp_detection() returns List[float] or None — it is NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the grasp_detection() result.
 
 Provided Python Functions/Class:
 
@@ -88,7 +90,8 @@ class ImagePatch:
 
     def find(self, object_name: str) -> list[ImagePatch]:
         """Returns a list of ImagePatch objects matching object_name contained in the crop if any are found.
-        Otherwise, returns an empty list.
+        IMPORTANT: If nothing is found, returns [None] (a list with one None element), NOT an empty list.
+        Always guard with: if patches[0] is None: return None
         Parameters
         ----------
         object_name : str
@@ -97,7 +100,7 @@ class ImagePatch:
         Returns
         -------
         list[ImagePatch]
-            a list of ImagePatch objects matching object_name contained in the crop
+            a list of ImagePatch objects, or [None] if nothing found
 
         Examples
         --------
@@ -267,7 +270,9 @@ class ImagePatch:
         return find_part(object_name, part_name)
         
     def grasp_detection(object_patch: ImagePatch)->List[float]:
-        """Returns the grasp pose of the object/part of object that centered in the object_patch
+        """Returns the grasp pose of the object/part of object that centered in the object_patch.
+        IMPORTANT: Returns a List[float] = [quality, x, y, w, h, angle], NOT an ImagePatch.
+        Do NOT call .overlaps_with() or any ImagePatch method on the result.
         Parameters
         ----------
         object_patch : ImagePatch
@@ -276,7 +281,7 @@ class ImagePatch:
         Returns
         -------
         List[float]
-            the grasp pose of the object/part of object that centered in the object_patch
+            [quality, x, y, w, h, angle] — a plain list of numbers, not an ImagePatch
             
         Examples
         --------
@@ -459,19 +464,42 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     knife_patches = image_patch.find("knife")
-    knife_patch = building_patches[0]
+    knife_patch = knife_patches[0]
     knife_blade_patch = knife_patch.find_part("knife", "blade")
     grasp_pose = image_patch.grasp_detection(knife_blade_patch)
     return grasp_pose
     ```
 
 ### Example 6
-Plan: 
+Plan:
 Step 1: Question about the Kleenex box in the image, find out its color.
 A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     kleenex_info = image_patch.llm_query("What is the color of the Kleenex package in the image?")
     return kleenex_info
+    ```
+
+### Example 7
+Plan:
+Step 1: Find the purple ball near the red mug.
+Step 2: Find the red mug in the image.
+Step 3: Among all purple balls, pick the one closest to the red mug.
+Step 4: Calculate the grasp pose for that purple ball.
+Note: find() returns [None] if nothing found — always check patches[0] is not None.
+Note: grasp_detection() returns List[float], not an ImagePatch — do not call any ImagePatch method on it.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    ball_patches = image_patch.find("purple ball")
+    mug_patches = image_patch.find("red mug")
+    if ball_patches[0] is None or mug_patches[0] is None:
+        return None
+    mug = mug_patches[0]
+    valid_balls = [p for p in ball_patches if p is not None]
+    valid_balls.sort(key=lambda p: abs(p.horizontal_center - mug.horizontal_center) +
+                                   abs(p.vertical_center - mug.vertical_center))
+    grasp_pose = image_patch.grasp_detection(valid_balls[0])
+    return grasp_pose
     ```
 '''

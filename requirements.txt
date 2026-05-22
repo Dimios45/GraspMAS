@@ -1,7 +1,6 @@
 openai
 transformers==4.48.0
 accelerate==0.26.1
-bitsandbytes==0.42.0
 jupyter==1.0.0
 numpy==1.26.3
 setuptools==75.8.0
@@ -9,3 +8,5 @@ shapely
 gdown
 scikit-image
 git+https://github.com/openai/CLIP.git
+sentence-transformers
+qwen-vl-utils
