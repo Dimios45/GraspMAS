@@ -24,7 +24,8 @@ Your job is to judge qualitatively whether the grasp is valid **with respect to 
    - **Collision Check**: (yes / no) — "yes" means the grasp clearly overlaps or touches any non-target object; "no" means it does not.
 
 4. **Decision Rule**:
-   - INVALID if fragile_overlap = high, or semantic_alignment = no, or critical error logs.
+   - If grasp is null/None AND error_logs is null: the object was simply not detected. Set verdict=INVALID, all checklist fields=no, summary="Object not detected in image — no grasp proposal was generated. Coder should retry find() with a simpler or alternative object description."
+   - INVALID if fragile_overlap = yes, or semantic_alignment = no, or critical error logs.
    - VALID otherwise.
 
 5. If error_logs exist, summarize them briefly and suggest how to recover.

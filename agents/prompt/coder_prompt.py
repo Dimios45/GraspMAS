@@ -10,6 +10,7 @@ Ensure your code follow the plan.
 4. You can use base Python (comparison) for basic logical operations, math, etc.
 5. ONLY call methods that exist in the ImagePatch class above. Never invent or call functions not listed there (e.g. adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses do NOT exist).
 6. grasp_detection() returns List[float] or None — it is NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the grasp_detection() result.
+7. ALWAYS add a null-check immediately after every find() call: `if patches[0] is None: return None`. Never iterate over or access attributes of a patch without this check first.
 
 Provided Python Functions/Class:
 
@@ -401,6 +402,8 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     carrot_patches = image_patch.find("carrot")
+    if carrot_patches[0] is None:
+        return None
     grasp_pose = image_patch.grasp_detection(carrot_patches[0])
     return grasp_pose
     ```

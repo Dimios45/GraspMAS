@@ -1,7 +1,9 @@
 import os
 import sys
 import asyncio
+import argparse
 import warnings
+from datetime import datetime
 warnings.filterwarnings('ignore')
 
 import mani_skill.envs
@@ -18,6 +20,16 @@ from mani_skill.utils.structs import Actor, Pose
 
 sys.path.insert(0, os.path.dirname(__file__))
 from agents.graspmas import GraspMAS
+from grasp_force import get_object_physics, compute_required_force, get_contact_forces, print_force_report
+
+# ── Output directories (timestamped per run) ─────────────────────────────────
+run_id   = datetime.now().strftime("%Y%m%d_%H%M%S")
+run_dir  = os.path.join("runs", run_id)
+img_dir  = os.path.join(run_dir, "imgs")
+vid_dir  = os.path.join(run_dir, "video")
+os.makedirs(img_dir, exist_ok=True)
+os.makedirs(vid_dir, exist_ok=True)
+print(f"Run output → {run_dir}/")
 
 # ── Environment ──────────────────────────────────────────────────────────────
 env = gym.make(
@@ -33,10 +45,9 @@ env = gym.make(
     enable_shadow=True,
 )
 
-os.makedirs('simulated_demo/pick_YCB_Clutter', exist_ok=True)
 env = RecordEpisode(
     env,
-    output_dir='simulated_demo/pick_YCB_Clutter',
+    output_dir=vid_dir,
     save_trajectory=False,
     trajectory_name='abc',
     save_video=True,
@@ -46,7 +57,8 @@ env = RecordEpisode(
     save_on_reset=False,
 )
 
-seed = 17
+seed = int(np.random.randint(0, 10000))
+print(f"Seed: {seed}")
 obs, _ = env.reset(seed=seed)
 rgb   = obs['sensor_data']['base_camera']['rgb'].cpu().squeeze().numpy()
 depth = obs['sensor_data']['base_camera']['depth'].cpu().squeeze().numpy()
@@ -56,22 +68,26 @@ if hasattr(third, 'cpu'):
 else:
     third = np.array(third)
 
-os.makedirs('imgs', exist_ok=True)
 fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 axes[0].set_title('RGB'); axes[0].imshow(rgb)
 axes[1].set_title('Depth'); axes[1].imshow(depth)
 axes[2].set_title('Third view'); axes[2].imshow(third)
 plt.tight_layout()
-plt.savefig('imgs/maniskill_obs.png', dpi=150)
+plt.savefig(os.path.join(img_dir, 'observation.png'), dpi=150)
 plt.close()
-print("Observation saved → imgs/maniskill_obs.png")
+print(f"Observation saved → {img_dir}/observation.png")
+
+# ── Ground-truth physics ──────────────────────────────────────────────────────
+physics   = get_object_physics(env.unwrapped)
+force_req = compute_required_force(physics, safety_factor=2.0)
+print_force_report(physics, force_req)
+query = f"Grasp the {physics['name']}."
 
 # ── GraspMAS ─────────────────────────────────────────────────────────────────
 graspmas = GraspMAS(api_file='api.key', max_round=5)
 
-query = "Grasp the lemon."
-print(f"\nQuery: {query}")
-_, grasp_2d = asyncio.run(graspmas.query(query, rgb))
+print(f"Query: {query}")
+_, grasp_2d = asyncio.run(graspmas.query(query, rgb, save_folder=img_dir))
 
 if grasp_2d is None:
     print("No grasp detected — exiting.")
@@ -125,6 +141,9 @@ print("Grasping...")
 planner.move_to_pose_with_screw(grasp_6d * sapien.Pose([0.005, 0, 0.015]))
 planner.close_gripper()
 
+contact = get_contact_forces(env.unwrapped)
+print_force_report(physics, force_req, contact)
+
 print("Moving to goal...")
 goal_pose = grasp_6d * sapien.Pose([0, 0, -0.4])
 env.unwrapped.goal_pos = torch.from_numpy(goal_pose.p)
@@ -134,4 +153,4 @@ planner.move_to_pose_with_screw(goal_pose)
 planner.close()
 env.flush_video()
 env.close()
-print("\nDone! Video saved → simulated_demo/pick_YCB_Clutter/")
+print(f"\nDone! All outputs saved → {run_dir}/")
