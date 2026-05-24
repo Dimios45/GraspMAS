@@ -88,6 +88,74 @@ The notebook includes detailed instructions on how to:
 # Note
 This is a research project, so the code may not be optimized, regularly updated, or actively maintained.
 
+# Mass Property Inference (PoC Extension)
+
+This fork adds a zero-shot YCB object mass predictor (`property_inference.py`) and
+a 5-fold cross-validation evaluation harness (`eval_mass.py`).
+
+## ManiSkill mass-readout API
+
+The ground-truth mass for each YCB object is computed directly from the
+simulation assets — no live ManiSkill run required:
+
+```python
+import json, trimesh
+from pathlib import Path
+
+ASSET_DIR = Path("~/.maniskill/data/assets/mani_skill2_ycb").expanduser()
+
+with open(ASSET_DIR / "info_pick_v0.json") as f:
+    info = json.load(f)                          # density + scale per object
+
+mesh  = trimesh.load(str(ASSET_DIR / "models" / obj_id / "collision.ply"))
+if not mesh.is_watertight:
+    mesh = mesh.convex_hull
+
+scale   = info[obj_id]["scales"][0]
+density = info[obj_id]["density"]                # kg/m³ (sim value)
+mass_kg = density * mesh.volume * scale**3       # exact PhysX value
+```
+
+This matches what SAPIEN/PhysX computes at actor-build time. Verified: all 78
+YCB objects return nonzero masses in the range 0.005–1.37 kg.
+
+## Results (Qwen2-VL-7B, 78 YCB objects, 5-fold CV)
+
+| Metric | Value |
+|---|---|
+| Detection rate | 100% (78/78) |
+| MAE_kg | 0.1803 kg |
+| MAPE | 126.4% |
+| Median error | 70.0% |
+| <25% error | 20.5% (16/78) |
+| <50% error | 32.1% (25/78) |
+
+Run: `runs/mass_eval_v2/` — see `docs/MASS_EVAL.md` for full analysis.
+
+## Running the mass eval
+
+```bash
+# print ground-truth table and verify the API (no GPU needed)
+python property_inference.py --verify-gt
+
+# full 5-fold eval (~25 min on AMD MI300X)
+conda run -n graspmas --no-capture-output \
+    python -u eval_mass.py --out-dir runs/mass_eval_v2 2>/dev/null \
+    | tee runs/mass_eval_v2.log
+
+# ablations
+conda run -n graspmas python -u eval_mass.py --no-retrieval    # random anchors
+conda run -n graspmas python -u eval_mass.py --direct          # no chain-of-thought
+conda run -n graspmas python -u eval_mass.py --no-anchor-blend # no post-blend
+
+# quick smoke test (first 10 objects, 1 sample)
+python eval_mass.py --limit 10 --n-samples 1
+```
+
+Outputs per run: `mass_results.csv`, `true_vs_pred.png`, `trace.jsonl`.
+
+---
+
 # Citation
 If you find our work useful for your research, please cite:
 ```

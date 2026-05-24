@@ -39,7 +39,7 @@ def _to_qwen_messages(messages):
     return out
 
 
-def vlm_chat(messages, max_new_tokens=300, **kwargs):
+def vlm_chat(messages, max_new_tokens=300, temperature=1.0, **kwargs):
     _load()
     msgs = _to_qwen_messages(messages)
     text = _processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
@@ -48,8 +48,11 @@ def vlm_chat(messages, max_new_tokens=300, **kwargs):
         text=[text], images=image_inputs, videos=video_inputs,
         padding=True, return_tensors="pt"
     ).to(next(_model.parameters()).device)
+    gen_kwargs = dict(max_new_tokens=max_new_tokens)
+    if temperature > 0 and temperature != 1.0:
+        gen_kwargs.update(do_sample=True, temperature=temperature)
     with torch.no_grad():
-        ids = _model.generate(**inputs, max_new_tokens=max_new_tokens)
+        ids = _model.generate(**inputs, **gen_kwargs)
     trimmed = ids[:, inputs.input_ids.shape[1]:]
     return _processor.batch_decode(
         trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
