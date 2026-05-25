@@ -57,7 +57,10 @@ env = RecordEpisode(
     save_on_reset=False,
 )
 
-seed = int(np.random.randint(0, 10000))
+_p = argparse.ArgumentParser()
+_p.add_argument("--seed", type=int, default=None)
+_args, _ = _p.parse_known_args()
+seed = _args.seed if _args.seed is not None else int(np.random.randint(0, 10000))
 print(f"Seed: {seed}")
 obs, _ = env.reset(seed=seed)
 rgb   = obs['sensor_data']['base_camera']['rgb'].cpu().squeeze().numpy()

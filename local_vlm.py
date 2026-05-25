@@ -1,3 +1,4 @@
+import os
 import torch
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
@@ -14,8 +15,9 @@ def _load():
     if _model is None:
         print(f"Loading {VLM_MODEL_ID} (first call — this takes a few minutes)...")
         _processor = AutoProcessor.from_pretrained(VLM_MODEL_ID)
+        _device = os.environ.get("VLM_DEVICE", "cuda:1")
         _model = Qwen2VLForConditionalGeneration.from_pretrained(
-            VLM_MODEL_ID, torch_dtype=torch.bfloat16, device_map={"": "cuda:1"}
+            VLM_MODEL_ID, torch_dtype=torch.bfloat16, device_map={"": _device}
         )
         _model.eval()
         print("VLM loaded.")
