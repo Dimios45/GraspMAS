@@ -75,15 +75,60 @@ If you want to customize tools or model hyperparameters and configurations, plea
     <img src="static/robot_exp.jpg" alt="image" />
 </p>
 
-We provide the notebook demo **`Maniskill_demo.ipynb`** for simulating language-driven grasp detection on the ManiSkill simulator. The simulation runs in a tabletop environment using a Panda robot arm equipped with a wrist camera.
+We provide the notebook demo **`Maniskill_demo.ipynb`** and the script **`run_maniskill_demo.py`** for simulating language-driven grasp detection on the ManiSkill simulator. The simulation runs in a tabletop environment using a Panda robot arm equipped with a wrist camera.
 
-The notebook includes detailed instructions on how to:
+**Run the demo:**
+```bash
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_maniskill_demo.py --seed 17
+```
 
-* Initialize the tabletop environment
-* Visualize observations
-* Use GraspMAS to generate grasp pose rectangles
-* Convert them to 6-DoF grasp poses
-* Manipulate the robot arm accordingly
+## Demo Pipeline
+
+```
+Seed → PickClutterYCB-v1 (SAPIEN/PhysX, CPU sim)
+            │
+            ▼  1. Observation
+   RGB + depth + third-person view saved to imgs/
+            │
+            ▼  2. Ground-truth physics (grasp_force.py)
+   Read from SAPIEN: mass, friction → F_required = safety × m × g / (2μ)
+            │
+            ▼  3. GraspMAS multi-agent loop (Qwen2-VL-7B)
+   ┌─────────────────────────────────────────────────┐
+   │  PLANNER  →  step-by-step natural language plan │
+   │  CODER    →  Python code using ImagePatch API   │
+   │                 find()       ← GroundingDINO + SAM   │
+   │                 grasp_detection() ← GraspNet (RAGT) │
+   │                 find_part()  ← VLpart            │
+   │  OBSERVER →  checks grasp on RGB overlay        │
+   │              VALID: done  |  INVALID: retry      │
+   │              (up to max_round=5 iterations)      │
+   └─────────────────────────────────────────────────┘
+            │  2D grasp: (quality, cx, cy, w, h, angle)
+            ▼  4. 2D → 6DoF projection
+   depth[cy, cx] → 3D camera coords
+   camera intrinsics (K) + extrinsics → world coords
+   jaw axis angle → gripper orientation
+            │
+            ▼  5. Motion planning + execution (mplib + toppra)
+   PandaArmMotionPlanningSolver:
+     (a) Reach  — approach 5 cm above grasp
+     (b) Grasp  — move in, close gripper
+     (c) Lift   — move to goal 40 cm up
+            │
+            ▼  6. Contact force validation
+   get_contact_forces() — compare actual vs F_required
+            │
+            ▼  Outputs
+   runs/<timestamp>/imgs/   — observations + grasp overlays
+   runs/<timestamp>/video/  — full episode recording
+```
+
+**What can fail:**
+- Object not detected by GroundingDINO → script exits with "No grasp detected"
+- Observer rejects all rounds → falls through with last best grasp
+- Bad depth at grasp centre (background pixel) → warning printed, planner still attempts
+- Motion planner finds no collision-free path → SAPIEN error, no lift
 
 # Note
 This is a research project, so the code may not be optimized, regularly updated, or actively maintained.
