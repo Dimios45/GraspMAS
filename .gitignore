@@ -15,3 +15,9 @@ main_batch.ipynb
 images/
 dataset/
 gradio_demo/
+runs/
+out/
+detectron2/detectron2/layers/csrc/**/*.hip
+detectron2/detectron2/layers/csrc/**/*_hip.cpp
+detectron2/detectron2/layers/csrc/**/*_hip.h
+detectron2/detectron2/layers/csrc/hip_version.hip

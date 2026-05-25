@@ -158,7 +158,7 @@ The geometric blend post-processes the raw LLM estimate when it diverges >3× fr
 | dice | 0.005 (−10% err) | 0.055 (+1007% err) | 0.005 | nearest anchor is much heavier |
 | banana | 0.217 (+4% err) | 0.100 (−52% err) | 0.208 | embedding pulled to wrong anchor |
 
-**Root cause:** SentenceTransformer embedding similarity does not always align with mass similarity. "toy airplane" embeds closest to heavier objects because the sentence representation does not encode scale. The blend then pulls a correct small prediction toward a wrong large anchor.
+**Root cause:** SentenceTransformer embedding similarity doesn't always align with mass similarity. "toy airplane" embeds closest to heavier objects (rubber ball, foam brick) because the sentence representation doesn't encode scale. The blend then pulls a correct small prediction toward a wrong large anchor.
 
 **Fix (future work):** Apply blend only when `raw_pred > nearest_anchor` (only correct overestimates, not underestimates). For underestimates, trust the raw prediction.
 
@@ -173,11 +173,11 @@ Four objects use density=50 kg/m³ in the sim (not physically realistic):
 | gelatin box | 50 | 0.010 kg | 0.023 kg | ~0.10 kg |
 | sugar box | 50 | 0.037 kg | 0.006 kg | ~0.51 kg |
 
-The model predicts real-world masses; the ground truth is a simulation artifact. Use `--sim-density-hint` to partially address this.
+The model predicts real-world masses; the ground truth is a simulation artifact. The only way to close this gap without providing the sim density is stronger anchor calibration from other density=50 objects in the fold.
 
 ### 4. Confidence always 1.0
 
-Temperature=0.9 produces zero variance in structured JSON outputs with this 7B model. All 5 self-consistency samples return identical values for every object. The confidence metric (IQR-based) correctly reports 1.0 but is therefore uninformative. **Use N=1 — 5× faster with identical results.**
+Temperature=0.9 produces zero variance in structured JSON outputs with this 7B model. All 5 self-consistency samples return identical values for every object. The confidence metric (IQR-based) correctly reports 1.0 but is therefore uninformative. **Self-consistency at N=5 adds no value here** — set `--n-samples 1` to halve eval time with identical accuracy.
 
 ---
 
@@ -228,14 +228,15 @@ python property_inference.py --verify-gt
 
 ---
 
-## Speed
+## Speed vs Paper Baseline
 
 | System | Objects | Time | Avg/object |
 |---|---|---|---|
 | Ours (Qwen2-VL-7B, local, N=5) | 78 | ~25 min | ~19s |
 | Ours (Qwen2-VL-7B, local, N=1) | 78 | ~13 min | ~10s |
+| GPT-4o API (hypothetical) | 78 | ~3 min | ~2s |
 
-At N=1 (samples are identical anyway at T=0.9), eval time halves with no accuracy loss.
+At N=1 (samples are identical anyway), eval time halves with no accuracy loss.
 
 ---
 
@@ -243,8 +244,8 @@ At N=1 (samples are identical anyway at T=0.9), eval time halves with no accurac
 
 | Priority | Change | Expected gain |
 |---|---|---|
-| High | Apply anchor blend only for overestimates, not underestimates | Fixes dice, toy airplane, large marker |
-| High | Use N=1 (confidence metric broken at T=0.9) | Halves runtime, no accuracy cost |
-| Medium | `--sim-density-hint` for box objects | Fixes density=50 outliers |
-| Medium | `--with-vision` for size-ambiguous objects | Better packing factor estimation |
-| Low | Higher temperature (1.2+) or prompt variation | Would make confidence metric meaningful |
+| High | Apply anchor blend only for overestimates, not underestimates | Fixes dice, toy airplane, large marker — removes ~10 worst cases |
+| High | Use N=1 (confidence metric is broken at T=0.9) | Halves runtime, no accuracy cost |
+| Medium | Add `--sim-density-hint` for box objects at eval time | Should fix density=50 outliers |
+| Medium | Use vision (`--with-vision`) for size-ambiguous objects | Better packing factor estimation |
+| Low | Try higher temperature (1.2+) or prompt variation for diversity | Would fix confidence metric |

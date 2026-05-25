@@ -156,6 +156,33 @@ Outputs per run: `mass_results.csv`, `true_vs_pred.png`, `trace.jsonl`.
 
 ---
 
+# Local Implementation & Results (AMD ROCm)
+
+This fork runs GraspMAS entirely locally on AMD MI300X using Qwen2-VL-7B-Instruct
+(ROCm 6.2.4, no cloud API required) and adds physics-aware force estimation.
+
+### Documentation
+
+| Doc | Contents |
+|---|---|
+| [SCRIPTS.md](SCRIPTS.md) | Every script: purpose, CLI flags, outputs, conda env setup |
+| [docs/GRASPMAS_QWEN.md](docs/GRASPMAS_QWEN.md) | System architecture, benchmark results vs paper |
+| [docs/GRASP_EXAMPLES.md](docs/GRASP_EXAMPLES.md) | Grasp pose format, worked examples, visualisations |
+| [docs/MASS_EVAL.md](docs/MASS_EVAL.md) | YCB mass prediction: pipeline, results, failure analysis |
+| [docs/QWEN_OCIDVLG.md](docs/QWEN_OCIDVLG.md) | OCID-VLG evaluation: 13% (full) / 34% (easy) success rate |
+
+### Benchmark Summary
+
+| Benchmark | Ours (Qwen2-VL-7B, local) | Paper (GPT-4o) |
+|---|---|---|
+| PickSingleYCB VALID rate | **66.2%** (49/74) | 82.0% |
+| PickClutterYCB VALID rate | **35.0%** (35/100) | 72.0% |
+| OCID-VLG success (full) | **13.0%** (13/100) | 62.0% |
+| OCID-VLG success (easy) | **34.0%** (34/100) | 62.0% |
+| YCB mass MAE | **0.180 kg** (78/78) | — |
+
+---
+
 # Citation
 If you find our work useful for your research, please cite:
 ```

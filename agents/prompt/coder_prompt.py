@@ -8,9 +8,10 @@ Ensure your code follow the plan.
 2. Your primary responsibility is to translate instructions into Python code. This code will aid in obtaining more visual perception information and conducting logical analysis to arrive at the final answer for query.
 3. Image patch is a crop of an image centered around a particular object.
 4. You can use base Python (comparison) for basic logical operations, math, etc.
-5. ONLY call methods that exist in the ImagePatch class above. Never invent or call functions not listed there (e.g. adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses do NOT exist).
+5. ONLY call methods that exist in the ImagePatch class above. NEVER invent or call functions not listed there. The following DO NOT EXIST and must never be called: adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses, calculate_fragile_overlap_and_collision, get_grasp_poses, filter_grasps, check_collision.
 6. grasp_detection() returns List[float] or None — it is NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the grasp_detection() result.
-7. ALWAYS add a null-check immediately after every find() call: `if patches[0] is None: return None`. Never iterate over or access attributes of a patch without this check first.
+7. ALWAYS null-check after find(): find() returns [None] if nothing found. ALWAYS write: if patches[0] is None: return None — before accessing any attribute on patches[0].
+8. Never call crop() directly. Use find() to locate objects — find() handles cropping internally.
 
 Provided Python Functions/Class:
 
@@ -186,17 +187,6 @@ class ImagePatch:
            
         """
         return simple_query(self.cropped_image, question)
-
-    def crop(self, left: int, lower: int, right: int, upper: int, mask) -> ImagePatch:
-        """Returns a new ImagePatch cropped from the current ImagePatch.
-        Parameters
-        -------
-        left, lower, right, upper : int
-            The (left/lower/right/upper)most pixel of the cropped image.
-        mask
-            A mask of the the most prominent object in the crop region. 
-        """
-        return ImagePatch(self.cropped_image, left, lower, right, upper, mask)
 
     def best_image_match(list_patches: list[ImagePatch], content: list[str], return_index=False) -> Union[ImagePatch, int]:
         """Returns the patch most likely to contain the content.
@@ -411,7 +401,7 @@ def execute_command(image):
 ### Example 2
 Plan:
 Step 1: Find all patches containing bottles in the image.
-Step 2: Iterate through each detected bottle patch. 
+Step 2: Iterate through each detected bottle patch.
 Step 3: Verify if the bottle is both blue and red.
 Step 4: Perform grasp pose detection for the blue bottle.
 Step 5: Handle the case where no blue bottles are found. Return None.
@@ -419,6 +409,8 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     bottle_patches = image_patch.find("bottle")
+    if bottle_patches[0] is None:
+        return None
     for bottle_patch in bottle_patches:
         if bottle_patch.verify_property("bottle", "blue and red"):
                 grasp_pose = image_patch.grasp_detection(bottle_patch)
@@ -436,9 +428,10 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     bar_patches = image_patch.find("chocolate bar")
+    if bar_patches[0] is None or len(bar_patches) < 2:
+        return None
     bar_patches.sort(key=lambda x: x.horizontal_center)
-    bar_patch = bar_patches[1]
-    grasp_pose = image_patch.grasp_detection(bar_patch)
+    grasp_pose = image_patch.grasp_detection(bar_patches[1])
     return grasp_pose
     ```
 
@@ -452,14 +445,15 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     apple_patches = image_patch.find("apple")
+    if apple_patches[0] is None:
+        return None
     apple_patches.sort(key=lambda x: x.vertical_center)
-    apple_patch = apple_patches[-1]
-    grasp_pose = image_patch.grasp_detection(apple_patch)
+    grasp_pose = image_patch.grasp_detection(apple_patches[-1])
     return grasp_pose
     ```
 
 ### Example 5
-Plan: 
+Plan:
 Step 1: Detect all knives in the image.
 Step 2: To handover to the user safely, locate the "blade" part of the first detected knife.
 Step 3: Calculate the grasp pose for the knife blade.
@@ -467,8 +461,9 @@ A: ```
 def execute_command(image):
     image_patch = ImagePatch(image)
     knife_patches = image_patch.find("knife")
-    knife_patch = knife_patches[0]
-    knife_blade_patch = knife_patch.find_part("knife", "blade")
+    if knife_patches[0] is None:
+        return None
+    knife_blade_patch = knife_patches[0].find_part("knife", "blade")
     grasp_pose = image_patch.grasp_detection(knife_blade_patch)
     return grasp_pose
     ```
