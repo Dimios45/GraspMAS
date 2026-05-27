@@ -19,224 +19,247 @@
 
 # Introduction
 ![image](static/method9.jpg)
+
 In this paper, we introduce GraspMAS, a new multi-agent system framework for language-driven grasp detection. GraspMAS is designed to reason through ambiguities and improve decision-making in real-world scenarios.
 
 ![image](static/compare_fig.jpg)
 
 Our method consistently produces more plausible grasp poses than existing methods.
+
+---
+
+> **This fork** replaces the OpenAI API with a fully local **Qwen2-VL-7B-Instruct** backend running on **AMD MI300X (ROCm 6.2.4)** — no cloud API cost, no internet dependency. It also adds a physics-aware gripper force estimation pipeline and zero-shot YCB mass prediction.  
+> See [Local Setup](#local-setup-amd-rocm) to get started.
+
+---
+
 # Installation
-Follow these steps to install the GraspMAS framework:
 
-1. **Clone recursively:**
-    ```bash
-    git clone --recurse-submodules https://github.com/Fsoft-AIC/GraspMAS.git
-    cd GraspMAS
-    ```
+### Original (NVIDIA CUDA)
 
-2. **OpenAI key:** To run the GraspMAS framework, you will need an OpenAI key. This can be done by signing up for an account and then creating a key in account/api-keys. Create a file api.key in the root of this project and store the key in it.
-    ```
-    echo YOUR_OPENAI_API_KEY_HERE > api.key
-    ```
-
-3. **Prepare environment:**
-   ```bash
-    conda create -n graspmas python=3.9 -y
-    conda activate graspmas
-    conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
-    conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=11.8 -c pytorch -c nvidia
-    pip install -r requirements.txt
-    cd detectron2
-    pip install -e .
-    cd ..
-   ```
-
-4. **Download pretrained model:**
-
-    ```bash 
-    bash download.sh
-    ```
-# Quickstart
-- You can start checking the notebook ```simple_demo.ipynb``` for simple demo inference. This notebook includes details instructions and executing queries with visualization. You can run either the complete closed-loop pipeline or the open-loop mode with Coder.
-- If you want to run inference on a single image, use the following:
 ```bash
-python main_simple.py \
-    --api-file "api.key" \
-    --max-round 5 \
-    --query "Grasp the knife at its handle" \
-    --image-path PATH-TO-INPUT-IMAGE \
-    --save-folder PATH-TO-SAVE-FOLDER
+git clone --recurse-submodules https://github.com/Fsoft-AIC/GraspMAS.git
+cd GraspMAS
+echo YOUR_OPENAI_API_KEY_HERE > api.key
+
+conda create -n graspmas python=3.9 -y
+conda activate graspmas
+conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
+conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+pip install -r requirements.txt
+cd detectron2 && pip install -e . && cd ..
+bash download.sh
 ```
 
-# Configuration
-If you want to customize tools or model hyperparameters and configurations, please refer to **`image_patch.py`**. We have only developed sufficient tools for language-driven grasp detection. The GraspMAS framework heavily depends on the effectiveness of pretrained models as tools, so results may be biased. Feel free to add or remove any pretrained models related to image or video processing, including any up-to-date models. Note that some models, such as BLIP or VLM, may require significant GPU memory.
+### Local Setup (AMD ROCm)
 
-# Maniskill Demo with GraspMAS
+Requires AMD GPU with ROCm 6.2+. Model: `Qwen2-VL-7B-Instruct` at `/mnt/data/mritunjoyh/models/Qwen2-VL-7B-Instruct`.
+
+```bash
+conda create -n graspmas python=3.9 -y
+conda activate graspmas
+
+# PyTorch ROCm build
+pip install torch==2.5.1+rocm6.2 torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2
+
+# Core deps — order matters (numpy pin is critical)
+pip install "numpy==1.26.4" "mplib==0.1.1"
+pip install toppra --no-binary toppra          # must build from source against numpy 1.26.x
+pip install "transformers==4.48.0"             # 4.49+ blocks torch.load on torch<2.6
+conda install -c conda-forge scipy -y          # conda-forge build avoids ROCm conflicts
+pip install -r requirements.txt
+
+cd detectron2 && pip install -e . && cd ..
+bash download.sh
+```
+
+**Critical version pins:**
+
+| Package | Version | Reason |
+|---|---|---|
+| `numpy` | 1.26.4 | mplib and toppra Cython extensions compiled against numpy 1.x |
+| `mplib` | 0.1.1 | mani-skill 3.0.1 requires exactly this version |
+| `transformers` | 4.48.0 | 4.49+ raises CVE-2025-32434 error with torch 2.5 |
+| `toppra` | source build | pip wheel compiled against wrong numpy; must rebuild |
+
+**GPU routing** (adjust to your free GPU index):
+```bash
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python run_maniskill_demo.py
+```
+
+---
+
+# Quickstart
+
+```bash
+# Single image inference
+python main_simple.py --query "Grasp the knife at its handle" \
+    --image-path path/to/image.png --api-file api.key
+
+# ManiSkill robot demo (reproducible seed)
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_maniskill_demo.py --seed 17
+
+# YCB single-object benchmark (74 objects)
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_graspmas_eval.py
+
+# YCB cluttered benchmark (100 seeds)
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_graspmas_cluttered_eval.py
+
+# Mass prediction eval (78 objects, 5-fold CV)
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u eval_mass.py
+```
+
+---
+
+# Configuration
+
+To customize tools or model hyperparameters refer to **`image_patch.py`**. The GraspMAS framework relies heavily on the effectiveness of its pretrained perception tools — feel free to swap in newer models. Note that models like BLIP2 and VLpart require significant GPU memory.
+
+---
+
+# ManiSkill Demo
+
 <p align="center">
-    <img src="static/robot_exp.jpg" alt="image" />
+    <img src="static/robot_exp.jpg" alt="robot experiment" />
 </p>
 
-We provide the notebook demo **`Maniskill_demo.ipynb`** and the script **`run_maniskill_demo.py`** for simulating language-driven grasp detection on the ManiSkill simulator. The simulation runs in a tabletop environment using a Panda robot arm equipped with a wrist camera.
+The script `run_maniskill_demo.py` runs the full GraspMAS pipeline end-to-end in ManiSkill: object detection → grasp prediction → motion planning → robot execution.
 
-**Run the demo:**
 ```bash
 CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_maniskill_demo.py --seed 17
 ```
 
-## Demo Pipeline
+## Pipeline
 
 ```
 Seed → PickClutterYCB-v1 (SAPIEN/PhysX, CPU sim)
             │
             ▼  1. Observation
-   RGB + depth + third-person view saved to imgs/
+   RGB + depth + third-person view  →  runs/<ts>/imgs/observation.png
             │
-            ▼  2. Ground-truth physics (grasp_force.py)
-   Read from SAPIEN: mass, friction → F_required = safety × m × g / (2μ)
+            ▼  2. Ground-truth physics  (grasp_force.py)
+   mass + friction from SAPIEN  →  F_required = safety × m × g / (2μ)
             │
-            ▼  3. GraspMAS multi-agent loop (Qwen2-VL-7B)
-   ┌─────────────────────────────────────────────────┐
-   │  PLANNER  →  step-by-step natural language plan │
-   │  CODER    →  Python code using ImagePatch API   │
-   │                 find()       ← GroundingDINO + SAM   │
-   │                 grasp_detection() ← GraspNet (RAGT) │
-   │                 find_part()  ← VLpart            │
-   │  OBSERVER →  checks grasp on RGB overlay        │
-   │              VALID: done  |  INVALID: retry      │
-   │              (up to max_round=5 iterations)      │
-   └─────────────────────────────────────────────────┘
+            ▼  3. GraspMAS multi-agent loop  (Qwen2-VL-7B)
+   ┌──────────────────────────────────────────────────────┐
+   │  PLANNER  →  step-by-step natural language plan      │
+   │  CODER    →  executable Python via ImagePatch API    │
+   │    find()            ←  GroundingDINO + SAM          │
+   │    grasp_detection() ←  GraspNet (RAGT)              │
+   │    find_part()       ←  VLpart                       │
+   │  OBSERVER →  reviews RGB + grasp overlay             │
+   │    VALID: return  |  INVALID: retry (max 5 rounds)   │
+   └──────────────────────────────────────────────────────┘
             │  2D grasp: (quality, cx, cy, w, h, angle)
             ▼  4. 2D → 6DoF projection
-   depth[cy, cx] → 3D camera coords
-   camera intrinsics (K) + extrinsics → world coords
-   jaw axis angle → gripper orientation
+   depth[cy,cx] → 3D camera space  (intrinsics K)
+   camera extrinsics  →  world coordinates
+   jaw angle  →  gripper orientation
             │
-            ▼  5. Motion planning + execution (mplib + toppra)
+            ▼  5. Motion planning + execution  (mplib + toppra)
    PandaArmMotionPlanningSolver:
-     (a) Reach  — approach 5 cm above grasp
+     (a) Reach  — approach 5 cm above grasp pose
      (b) Grasp  — move in, close gripper
-     (c) Lift   — move to goal 40 cm up
+     (c) Lift   — move to goal 40 cm above table
             │
             ▼  6. Contact force validation
-   get_contact_forces() — compare actual vs F_required
+   get_contact_forces()  →  compare actual vs F_required
             │
             ▼  Outputs
-   runs/<timestamp>/imgs/   — observations + grasp overlays
-   runs/<timestamp>/video/  — full episode recording
+   runs/<ts>/imgs/    — observations + grasp overlays
+   runs/<ts>/video/   — full episode video
 ```
 
-**What can fail:**
-- Object not detected by GroundingDINO → script exits with "No grasp detected"
-- Observer rejects all rounds → falls through with last best grasp
-- Bad depth at grasp centre (background pixel) → warning printed, planner still attempts
-- Motion planner finds no collision-free path → SAPIEN error, no lift
+**Failure modes:** no detection → exit early; bad depth → warning + attempt; planner path failure → SAPIEN error, no lift.
 
-# Note
-This is a research project, so the code may not be optimized, regularly updated, or actively maintained.
+---
 
-# Mass Property Inference (PoC Extension)
+# Results
 
-This fork adds a zero-shot YCB object mass predictor (`property_inference.py`) and
-a 5-fold cross-validation evaluation harness (`eval_mass.py`).
+## ManiSkill Benchmarks
 
-## ManiSkill mass-readout API
+Our primary results on ManiSkill — comparing local Qwen2-VL-7B against the paper's GPT-4o numbers.
 
-The ground-truth mass for each YCB object is computed directly from the
-simulation assets — no live ManiSkill run required:
+<p align="center">
+    <img src="docs/assets/benchmark_comparison.png" alt="Benchmark comparison" width="700"/>
+</p>
 
-```python
-import json, trimesh
-from pathlib import Path
+| Benchmark | Setting | Ours (Qwen2-VL-7B) | Paper (GPT-4o) | Gap |
+|---|---|---|---|---|
+| **PickSingleYCB** | VALID rate, 74 objects | **66.2%** (49/74) | 82.0% | −15.8 pp |
+| **PickClutterYCB** | VALID rate, 100 seeds | **35.0%** (35/100) | 72.0% | −37.0 pp |
+| **OCID-VLG** | Success, 100 samples (all categories) | **13.0%** (13/100) | 62.0% | −49.0 pp |
+| **OCID-VLG** | Success, 100 samples (easy subset) | **34.0%** (34/100) | 62.0% | −28.0 pp |
+| **YCB Mass** | MAE, 78 objects (5-fold CV) | **0.180 kg** | — | — |
 
-ASSET_DIR = Path("~/.maniskill/data/assets/mani_skill2_ycb").expanduser()
+> The gap on simple, visually distinctive queries narrows significantly: apple and ball categories match the paper's overall baseline (62%) on the easy OCID-VLG subset.  
+> Speed: ~13× slower than GPT-4o API (local 7B inference without quantization). 4-bit quantization would reduce latency to ~5–8s/sample.
 
-with open(ASSET_DIR / "info_pick_v0.json") as f:
-    info = json.load(f)                          # density + scale per object
+**Detailed analysis:**
+- [docs/GRASPMAS_QWEN.md](docs/GRASPMAS_QWEN.md) — single + cluttered YCB results, per-category breakdown
+- [docs/QWEN_OCIDVLG.md](docs/QWEN_OCIDVLG.md) — OCID-VLG deep dive, failure modes, prompt fixes applied
 
-mesh  = trimesh.load(str(ASSET_DIR / "models" / obj_id / "collision.ply"))
-if not mesh.is_watertight:
-    mesh = mesh.convex_hull
+---
 
-scale   = info[obj_id]["scales"][0]
-density = info[obj_id]["density"]                # kg/m³ (sim value)
-mass_kg = density * mesh.volume * scale**3       # exact PhysX value
-```
+## Mass Prediction
 
-This matches what SAPIEN/PhysX computes at actor-build time. Verified: all 78
-YCB objects return nonzero masses in the range 0.005–1.37 kg.
-
-## Results (Qwen2-VL-7B, 78 YCB objects, 5-fold CV)
+Zero-shot YCB mass estimation using chain-of-thought decomposition with embedding-based anchor retrieval.
 
 | Metric | Value |
 |---|---|
 | Detection rate | 100% (78/78) |
-| MAE_kg | 0.1803 kg |
+| MAE | 0.1803 kg |
 | MAPE | 126.4% |
 | Median error | 70.0% |
-| <25% error | 20.5% (16/78) |
-| <50% error | 32.1% (25/78) |
+| < 25% error | 20.5% (16/78) |
+| < 50% error | 32.1% (25/78) |
 
-Run: `runs/mass_eval_v2/` — see `docs/MASS_EVAL.md` for full analysis.
-
-## Running the mass eval
-
-```bash
-# print ground-truth table and verify the API (no GPU needed)
-python property_inference.py --verify-gt
-
-# full 5-fold eval (~25 min on AMD MI300X)
-conda run -n graspmas --no-capture-output \
-    python -u eval_mass.py --out-dir runs/mass_eval_v2 2>/dev/null \
-    | tee runs/mass_eval_v2.log
-
-# ablations
-conda run -n graspmas python -u eval_mass.py --no-retrieval    # random anchors
-conda run -n graspmas python -u eval_mass.py --direct          # no chain-of-thought
-conda run -n graspmas python -u eval_mass.py --no-anchor-blend # no post-blend
-
-# quick smoke test (first 10 objects, 1 sample)
-python eval_mass.py --limit 10 --n-samples 1
-```
-
-Outputs per run: `mass_results.csv`, `true_vs_pred.png`, `trace.jsonl`.
+See [docs/MASS_EVAL.md](docs/MASS_EVAL.md) for full analysis, ablation results, and failure mode breakdown.
 
 ---
 
-# Local Implementation & Results (AMD ROCm)
+## Force Estimation
 
-This fork runs GraspMAS entirely locally on AMD MI300X using Qwen2-VL-7B-Instruct
-(ROCm 6.2.4, no cloud API required) and adds physics-aware force estimation.
+Physics-aware gripper force estimation: ground-truth simulator physics vs Qwen2-VL visual estimates across all 78 YCB objects.
 
-### Documentation
+- **E0 baseline** (`run_force_benchmark.py`) — raw VLM force estimation
+- **E1 experiment** (`run_benchmark_e1.py`) — material classification + lookup table friction (3 variants)
 
-| Doc | Contents |
+See [docs/FORCE_ESTIMATION.md](docs/FORCE_ESTIMATION.md) for methodology and results.
+
+---
+
+# Documentation
+
+| File | Contents |
 |---|---|
-| [SCRIPTS.md](SCRIPTS.md) | Every script: purpose, CLI flags, outputs, conda env setup |
-| [docs/GRASPMAS_QWEN.md](docs/GRASPMAS_QWEN.md) | System architecture, benchmark results vs paper |
-| [docs/GRASP_EXAMPLES.md](docs/GRASP_EXAMPLES.md) | Grasp pose format, worked examples, visualisations |
-| [docs/MASS_EVAL.md](docs/MASS_EVAL.md) | YCB mass prediction: pipeline, results, failure analysis |
-| [docs/QWEN_OCIDVLG.md](docs/QWEN_OCIDVLG.md) | OCID-VLG evaluation: 13% (full) / 34% (easy) success rate |
+| [SCRIPTS.md](SCRIPTS.md) | Every script: purpose, CLI flags, expected outputs, conda env pins |
+| [docs/GRASPMAS_QWEN.md](docs/GRASPMAS_QWEN.md) | System architecture, PickSingleYCB + PickClutterYCB results |
+| [docs/GRASP_EXAMPLES.md](docs/GRASP_EXAMPLES.md) | Grasp pose format `(q, cx, cy, w, h, θ)`, worked examples |
+| [docs/MASS_EVAL.md](docs/MASS_EVAL.md) | YCB mass prediction: pipeline, v1→v2 improvements, ablations |
+| [docs/QWEN_OCIDVLG.md](docs/QWEN_OCIDVLG.md) | OCID-VLG evaluation: 13% full / 34% easy, per-category breakdown |
+| [docs/FORCE_ESTIMATION.md](docs/FORCE_ESTIMATION.md) | Gripper force estimation: E0 baseline + E1 material table |
 
-### Benchmark Summary
+---
 
-| Benchmark | Ours (Qwen2-VL-7B, local) | Paper (GPT-4o) |
-|---|---|---|
-| PickSingleYCB VALID rate | **66.2%** (49/74) | 82.0% |
-| PickClutterYCB VALID rate | **35.0%** (35/100) | 72.0% |
-| OCID-VLG success (full) | **13.0%** (13/100) | 62.0% |
-| OCID-VLG success (easy) | **34.0%** (34/100) | 62.0% |
-| YCB mass MAE | **0.180 kg** (78/78) | — |
+# Note
+
+This is a research project and may not be optimized, regularly updated, or actively maintained.
 
 ---
 
 # Citation
-If you find our work useful for your research, please cite:
-```
+
+```bibtex
 @inproceedings{nguyen2025graspmas,
-      title = {GraspMAS: Zero-Shot Language-driven Grasp Detection with Multi-Agent System},
-      author = {Nguyen, Quang and Le, Tri and Nguyen, Huy and Vo, Thieu and Ta, Tung D and Huang, Baoru and Vu, Minh N and Nguyen, Anh},
-      booktitle = IROS,
-      year      = {2025}
-  }
+    title  = {GraspMAS: Zero-Shot Language-driven Grasp Detection with Multi-Agent System},
+    author = {Nguyen, Quang and Le, Tri and Nguyen, Huy and Vo, Thieu and Ta, Tung D
+              and Huang, Baoru and Vu, Minh N and Nguyen, Anh},
+    booktitle = {IROS},
+    year      = {2025}
+}
 ```
+
 # Acknowledgement
-We thank the valuable work of [ViperGPT](https://github.com/cvlab-columbia/viper), [ViperDuality](https://github.com/duality-robotics/viper/tree/main) that inspired and enabled this research.
+
+We thank the valuable work of [ViperGPT](https://github.com/cvlab-columbia/viper) and [ViperDuality](https://github.com/duality-robotics/viper/tree/main) that inspired and enabled this research.
