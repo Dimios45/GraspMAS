@@ -92,6 +92,52 @@ def detect_grasp(grasp_model, image, mask, device):
     best_grasp = get_best_grasp(mask, boxes)
     return best_grasp
 
+
+def detect_grasp_directional(grasp_model, image, mask, device, direction="center"):
+    """Like detect_grasp but selects the candidate closest to the requested side.
+
+    direction: "top" | "bottom" | "left" | "right" | "center"
+    Picks from all RAGT candidates (lower threshold) the one whose center
+    is nearest to a target point 30% in from the requested edge of the mask.
+    """
+    if direction == "center":
+        return detect_grasp(grasp_model, image, mask, device)
+
+    result = cv2.bitwise_and(image, image, mask=mask)
+    img_t = torch.from_numpy(result).permute(2, 0, 1).float().unsqueeze(0).to(device)
+
+    # Get as many candidates as possible by lowering the confidence threshold
+    boxes = None
+    for thresh in [0.5, 0.2, 0.05]:
+        boxes = grasp_model(img_t, thresh)
+        if len(boxes) >= 3:
+            break
+
+    if boxes is None or len(boxes) == 0:
+        return detect_grasp(grasp_model, image, mask, device)
+
+    # Compute mask extents to locate the target point for the requested direction
+    ys, xs = np.where(mask > 0)
+    if len(ys) == 0:
+        return get_best_grasp(mask, boxes)
+
+    cx_mid = (xs.min() + xs.max()) / 2.0
+    cy_mid = (ys.min() + ys.max()) / 2.0
+    f = 0.3   # how far from edge toward center the target sits
+
+    target = {
+        "top":    (cx_mid, ys.min() + (cy_mid - ys.min()) * f),
+        "bottom": (cx_mid, ys.max() - (ys.max() - cy_mid) * f),
+        "left":   (xs.min() + (cx_mid - xs.min()) * f, cy_mid),
+        "right":  (xs.max() - (xs.max() - cx_mid) * f, cy_mid),
+    }.get(direction, (cx_mid, cy_mid))
+
+    tx, ty = target
+    boxes_cpu = boxes.detach().cpu()
+    dists = (boxes_cpu[:, 1] - tx) ** 2 + (boxes_cpu[:, 2] - ty) ** 2
+    idx = int(dists.argmin().item())
+    return boxes[idx]
+
 if __name__ == '__main__':
     image_fn = "data/grasp-anything/image/ccd42137b3646367bad45436a70454c33b819399d0d92e72f7e0119d0e43ffc2.jpg"
     image = Image.open(image_fn)

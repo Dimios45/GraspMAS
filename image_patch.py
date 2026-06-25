@@ -17,7 +17,7 @@ from transformers import (Blip2ForConditionalGeneration, Blip2Processor,
                           DPTImageProcessor, DPTForDepthEstimation, 
                           AutoModelForMaskGeneration, AutoProcessor, pipeline,
                           Owlv2Processor, Owlv2ForObjectDetection)
-from grasp.unit_grasp_pose_generation import detect_grasp, load_grasp_model, get_best_grasp
+from grasp.unit_grasp_pose_generation import detect_grasp, detect_grasp_directional, load_grasp_model, get_best_grasp
 from vlpart.vlpart import build_vlpart
 import detectron2.data.transforms as T
 
@@ -618,6 +618,34 @@ class ImagePatch:
         obj = self.crop(left, self.height-upper, right, self.height-lower, mask=mask_original, object_name=f"{object_name}_{part_name}")
         return obj
         
+    def grasp_detection_directional(self, object_patch, direction: str = "center"):
+        """Return a grasp pose biased toward the requested side of the object.
+
+        Parameters
+        ----------
+        object_patch : ImagePatch
+            Patch (with mask) of the object to grasp.
+        direction : str
+            One of "top", "bottom", "left", "right", "center".
+            Selects from all RAGT candidates the one closest to that side.
+
+        Returns
+        -------
+        List[float]
+            [quality, x, y, w, h, angle]
+        """
+        if object_patch is None:
+            return None
+        image = np.array(self.PIL_img)
+        mask = object_patch.mask
+        image_resized = cv2.resize(image, (416, 416))
+        mask_resized = cv2.resize(mask, (416, 416))
+        grasp_pose = detect_grasp_directional(
+            grasp_model, image_resized, mask_resized, device, direction
+        ).detach().cpu().numpy()
+        grasp_pose = resize_rectangle((416, 416), (image.shape[1], image.shape[0]), grasp_pose)
+        return grasp_pose
+
     def grasp_detection(self, object_patch):
         """Return a best grasp pose with given a mask of an object in the image
         Parameters

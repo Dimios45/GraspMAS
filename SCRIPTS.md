@@ -262,6 +262,113 @@ CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 \
 
 ---
 
+### `run_mustard_demo.py` — Single-object directional demo
+
+Runs 4 directional grasp prompts (top / right / left / bottom) on any YCB object and saves one video per direction. Loads VLMs once; all 4 directions share the process.
+
+**Command:**
+
+```bash
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    python run_mustard_demo.py --object-id 013_apple --seed 42
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--object-id` | `006_mustard_bottle` | Any YCB object ID, e.g. `077_rubiks_cube` |
+| `--seed` | `42` | ManiSkill episode seed |
+
+**Outputs** (under `object_demo/<object_name>_<timestamp>/`):
+
+```
+imgs_top/observation.png      — RGB / depth / third-view per direction
+imgs_top/grasp_*.png          — GraspMAS intermediate visualisations
+videos/top/0.mp4              — episode video (one per direction)
+videos/right/0.mp4
+videos/left/0.mp4
+videos/bottom/0.mp4
+```
+
+Browse via HTTP: `python -m http.server 8787 --directory object_demo` then open `localhost:8787`.
+
+---
+
+### `run_all_objects_demo.py` — Full 49-object directional batch
+
+Runs `run_mustard_demo` logic for all 49 VALID YCB objects in a single process. VLMs are loaded once. Supports crash recovery (resume from partial run) and per-direction video-skip logic.
+
+**Command:**
+
+```bash
+# Fresh run
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    nohup python run_all_objects_demo.py --seed 42 \
+    > logs/batch.log 2>&1 &
+
+# Resume a crashed run
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    python run_all_objects_demo.py --resume object_demo/all_20260624_215600
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--seed` | `42` | Shared ManiSkill episode seed |
+| `--resume` | — | Path to an existing batch dir to resume from |
+
+**Crash safety:** each direction is wrapped in `try/except`; failures are logged and the batch continues. Results are saved incrementally to `results.json` after every direction so a crash never loses completed work.
+
+**Outputs** (under `object_demo/all_<timestamp>/`):
+
+```
+results.json                  — all direction results (success, height, angle, mass, timing)
+<object>/videos/top/0.mp4     — one video per object per direction
+<object>/imgs_top/            — GraspMAS visualisations
+```
+
+**Results (seed=42, 49 objects):**
+
+| Direction | Approach | Success |
+|---|---|---|
+| top    | `[0, 0, −1]`     | 24/39 (62%) |
+| right  | `[0, −1, −1]/√2` | 13/39 (33%) |
+| left   | `[0, +1, −1]/√2` | 6/39  (15%) |
+| bottom | `[0,  0, −1]`    | 24/40 (60%) |
+| **Total** | | **67/157 (42.7%)** |
+
+Perfect 4/4 objects: apple, lemon, orange, softball, tennis ball, cups.
+
+Check progress during a run:
+```bash
+tail -f logs/batch.log
+grep "is_grasped" logs/batch.log | tail -20
+```
+
+---
+
+### `run_clamp_parts_demo.py` — Semantic part grasping
+
+Runs 3 semantic-part prompts on `050_medium_clamp`: loop, right handle, left handle. Uses `find_part()` (VLpart) for sub-object localisation.
+
+**Command:**
+
+```bash
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    python run_clamp_parts_demo.py
+```
+
+No flags. Object and seed are fixed (`050_medium_clamp`, seed=42).
+
+**Outputs** (under `object_demo/clamp_parts_<timestamp>/`):
+
+```
+videos/loop/0.mp4
+videos/right_handle/0.mp4
+videos/left_handle/0.mp4
+imgs_loop/ imgs_right_handle/ imgs_left_handle/
+```
+
+---
+
 ### `run_gemini_grasp.py` — Gemini Direct baseline
 
 Single-turn Gemini API call for grasp detection — no multi-agent loop, no local GPU.

@@ -174,6 +174,68 @@ Seed → PickClutterYCB-v1 (SAPIEN/PhysX, CPU sim)
 
 ---
 
+# Directional 6-DoF Grasping
+
+This fork extends the base GraspMAS pipeline with **language-conditioned approach directions**: the direction word in the prompt ("top", "right", "left", "bottom") determines the 3D trajectory the robot uses to approach and grasp the object, not just the 2D contact point.
+
+## Pipeline
+
+```
+Prompt: "Pick the orange up from the right hand side"
+                │
+                ▼ GraspMAS (Planner→Coder→Observer)
+        grasp_detection_directional(patch, "right")
+                │  selects RAGT candidate closest to right edge of mask
+                ▼
+        2D grasp: (q, cx, cy, w, h, θ)   ← θ = jaw rotation only
+                │
+                ▼ 2D → 6-DoF
+        grasp_center = obj_pos + dir_offset   ← GT position + bbox offset
+        approach_dir = [0, -1, -1]/√2         ← camera-right = world +Y
+        closing_dir  = Gram-Schmidt(θ, approach_dir)
+        grasp_6d     = build_grasp_pose(approach_dir, closing_dir, grasp_center)
+                │
+                ▼ Motion planning
+        pre-grasp → grasp → close gripper → lift
+```
+
+The key coordinate-frame insight: the camera looks in the **−X direction** from position `(0.3, 0, 0.6)`, so camera-right maps to world **+Y** (not +X). The robot base is at X = −0.615, making ±X approaches kinematically asymmetric. Full derivation in [docs/DIRECTIONAL_6DOF.md](docs/DIRECTIONAL_6DOF.md).
+
+## Batch Results — 49 YCB objects × 4 directions
+
+| Direction | Approach | Success |
+|-----------|----------|---------|
+| top | `[0, 0, −1]` | 24/39 **(62%)** |
+| right | `[0, −1, −1]/√2` | 13/39 **(33%)** |
+| left | `[0, +1, −1]/√2` | 6/39 **(15%)** |
+| bottom | `[0, 0, −1]` | 24/40 **(60%)** |
+| **Total** | | **67/157 (42.7%)** |
+
+**6 perfect objects (4/4):** apple, lemon, orange, softball, tennis ball, cups.
+
+Run the full batch:
+
+```bash
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    nohup python run_all_objects_demo.py --seed 42 > logs/batch.log 2>&1 &
+```
+
+Single object (any `--object-id`):
+
+```bash
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    python run_mustard_demo.py --object-id 013_apple --seed 42
+```
+
+Semantic part grasping (loop / right handle / left handle):
+
+```bash
+CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
+    python run_clamp_parts_demo.py
+```
+
+---
+
 # Results
 
 ## ManiSkill Benchmarks
@@ -234,6 +296,7 @@ See [docs/FORCE_ESTIMATION.md](docs/FORCE_ESTIMATION.md) for methodology and res
 | File | Contents |
 |---|---|
 | [SCRIPTS.md](SCRIPTS.md) | Every script: purpose, CLI flags, expected outputs, conda env pins |
+| [docs/DIRECTIONAL_6DOF.md](docs/DIRECTIONAL_6DOF.md) | Directional 6-DoF grasping: pipeline, coordinate frame, results, limitations |
 | [docs/GRASPMAS_QWEN.md](docs/GRASPMAS_QWEN.md) | System architecture, PickSingleYCB + PickClutterYCB results |
 | [docs/GRASP_EXAMPLES.md](docs/GRASP_EXAMPLES.md) | Grasp pose format `(q, cx, cy, w, h, θ)`, worked examples |
 | [docs/MASS_EVAL.md](docs/MASS_EVAL.md) | YCB mass prediction: pipeline, v1→v2 improvements, ablations |

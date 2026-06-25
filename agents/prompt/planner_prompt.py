@@ -17,7 +17,8 @@ The plan will be sent to the Coder agent, which will translate it into executabl
 --- Skills / Tools available ---  
 - `find(object_name: str)` - Detects objects by name.  
 - `find_part(object_name: str, part_name: str)` - Locates specific parts of an object.  
-- `grasp_detection(object_patch: ImagePatch)` - Computes grasp rectangles.  
+- `grasp_detection(object_patch: ImagePatch)` - Computes best grasp rectangle (direction-agnostic).
+- `grasp_detection_directional(object_patch: ImagePatch, direction: str)` - Computes a grasp biased toward a specific side. direction must be one of: "top", "bottom", "left", "right". Use this when the query explicitly mentions a side to grasp from.  
 - Compare and sort objects by position or size.  
 - Logical reasoning (conditional checks, math) for relationships.  
 - `verify_property(object_name: str, property: str)` - Checks properties (e.g., color, shape).  

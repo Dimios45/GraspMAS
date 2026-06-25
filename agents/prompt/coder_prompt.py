@@ -9,6 +9,7 @@ Ensure your code follow the plan.
 3. Image patch is a crop of an image centered around a particular object.
 4. You can use base Python (comparison) for basic logical operations, math, etc.
 5. ONLY call methods that exist in the ImagePatch class above. NEVER invent or call functions not listed there. The following DO NOT EXIST and must never be called: adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses, calculate_fragile_overlap_and_collision, get_grasp_poses, filter_grasps, check_collision.
+5b. When the query says "from the top / bottom / left / right", use grasp_detection_directional(patch, direction) with the matching direction string instead of grasp_detection().
 6. grasp_detection() returns List[float] or None — it is NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the grasp_detection() result.
 7. ALWAYS null-check after find(): find() returns [None] if nothing found. ALWAYS write: if patches[0] is None: return None — before accessing any attribute on patches[0].
 8. Never call crop() directly. Use find() to locate objects — find() handles cropping internally.
@@ -56,8 +57,12 @@ class ImagePatch:
     llm_query(question: str)->str
         Returns the answer to a question asked about the image using the LLM model. Typical use when the question is complex, ambiguous, or requires external knowledge. 
         Typically ask about the object properties, relationships between them. For example: Ask the color of the Kleenex package in the image.
-    grasp_detection(object_patch: ImagePatch):->List[float]
-        Return a best grasp pose detected with given object_patch object (contain mask and image of crops of object part)
+    grasp_detection(object_patch: ImagePatch)->List[float]
+        Return the single best grasp pose for object_patch (quality, x, y, w, h, angle).
+    grasp_detection_directional(object_patch: ImagePatch, direction: str)->List[float]
+        Return a grasp pose biased toward a specific side of the object.
+        direction must be one of: "top", "bottom", "left", "right", "center".
+        Use this when the query specifies a side to grasp from.
     """
 
     def __init__(self, image, left: int = None, lower: int = None, right: int = None, upper: int = None):
@@ -476,6 +481,34 @@ def execute_command(image):
     image_patch = ImagePatch(image)
     kleenex_info = image_patch.llm_query("What is the color of the Kleenex package in the image?")
     return kleenex_info
+    ```
+
+### Example 8
+Plan:
+Step 1: Find the banana in the image.
+Step 2: Detect a grasp on the left side of the banana.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    patches = image_patch.find("banana")
+    if patches[0] is None:
+        return None
+    grasp_pose = image_patch.grasp_detection_directional(patches[0], "left")
+    return grasp_pose
+    ```
+
+### Example 9
+Plan:
+Step 1: Find the bottle in the image.
+Step 2: Grasp the bottle from the top.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    patches = image_patch.find("bottle")
+    if patches[0] is None:
+        return None
+    grasp_pose = image_patch.grasp_detection_directional(patches[0], "top")
+    return grasp_pose
     ```
 
 ### Example 7
