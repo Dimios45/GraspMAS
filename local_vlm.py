@@ -41,8 +41,22 @@ def _to_qwen_messages(messages):
     return out
 
 
+def _telemetry():
+    try:
+        from gmas.telemetry import Telemetry
+        return Telemetry.active()
+    except Exception:
+        return None
+
+
 def vlm_chat(messages, max_new_tokens=300, temperature=1.0, **kwargs):
+    import time as _time
+    tel = _telemetry()
+    was_unloaded = _model is None
+    t_load0 = _time.time()
     _load()
+    if tel is not None and was_unloaded:
+        tel.vlm_load_s += _time.time() - t_load0
     msgs = _to_qwen_messages(messages)
     text = _processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
     image_inputs, video_inputs = process_vision_info(msgs)
@@ -53,9 +67,17 @@ def vlm_chat(messages, max_new_tokens=300, temperature=1.0, **kwargs):
     gen_kwargs = dict(max_new_tokens=max_new_tokens)
     if temperature > 0 and temperature != 1.0:
         gen_kwargs.update(do_sample=True, temperature=temperature)
+    t0 = _time.time()
     with torch.no_grad():
         ids = _model.generate(**inputs, **gen_kwargs)
     trimmed = ids[:, inputs.input_ids.shape[1]:]
+    if tel is not None:
+        tel.record_llm(
+            wall_s=round(_time.time() - t0, 3),
+            input_tokens=int(inputs.input_ids.shape[1]),
+            output_tokens=int(trimmed.shape[1]),
+            n_images=len(image_inputs) if image_inputs else 0,
+        )
     return _processor.batch_decode(
         trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
     )[0]

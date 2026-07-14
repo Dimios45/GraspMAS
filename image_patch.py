@@ -48,11 +48,20 @@ vlpart = build_vlpart(checkpoint=vlpart_checkpoint)
 vlpart.to(device=device)
 THRESHOLD_VLPART = 0.3
 
-## BLIP2 model
-blip_processor = Blip2Processor.from_pretrained("/mnt/data/mritunjoyh/models/blip2-flan-t5-xl")
-blip_model = Blip2ForConditionalGeneration.from_pretrained(
-    "/mnt/data/mritunjoyh/models/blip2-flan-t5-xl", torch_dtype=torch.bfloat16
-).to(device)
+## BLIP2 model — lazy-loaded on first use (weights are ~15GB and only
+## needed by best_image_match, which most queries never call)
+BLIP2_PATH = "/mnt/data/mritunjoyh/models/blip2-flan-t5-xl"
+blip_processor = None
+blip_model = None
+
+def _load_blip2():
+    global blip_processor, blip_model
+    if blip_model is None:
+        blip_processor = Blip2Processor.from_pretrained(BLIP2_PATH)
+        blip_model = Blip2ForConditionalGeneration.from_pretrained(
+            BLIP2_PATH, torch_dtype=torch.bfloat16
+        ).to(device)
+    return blip_processor, blip_model
 
 ## MiDAS model
 depth_id = "/mnt/data/mritunjoyh/models/dpt-hybrid-midas"
@@ -427,6 +436,7 @@ class ImagePatch:
         if len(list_patches) == 0:
             return None
 
+        blip_processor, blip_model = _load_blip2()
         patch_embeddings = []
         for patch in list_patches:
             inputs = blip_processor(images=patch.PIL_img, return_tensors="pt").to(device="cuda", dtype=torch.bfloat16)

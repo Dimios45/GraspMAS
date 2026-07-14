@@ -107,7 +107,23 @@ CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_graspmas_cluttered_eval.p
 
 # Mass prediction eval (78 objects, 5-fold CV)
 CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u eval_mass.py
+
+# gmas runtime A/B eval (OCID-VLG): legacy loop vs structured agent runtime
+python -m gmas.eval.run_ocidvlg_ab --root /path/to/ocid-vlg --arm gmas --flags all --n 100 --seed 42
 ```
+
+---
+
+# gmas — structured agent runtime (A/B-proven)
+
+`gmas/` re-hosts the Planner→Coder→Observer loop on an OpenClaw-style runtime
+(typed messages, tool registry, AST-repairing sandbox instead of bare `exec`,
+per-session tool cache, confidence-gated Observer, audit logs). Same prompts,
+same models, feature-flagged for ablation. On OCID-VLG (3 seeds × 100
+queries): syntax-error aborts 30 → **0**, detection 51% → **78%**, median
+latency −38%, LLM calls −22%, success 14.0±2.2 → **16.3±1.3** (wins at every
+seed). Full architecture, ablation attribution, and reproduction guide:
+**[docs/GMAS_RUNTIME.md](docs/GMAS_RUNTIME.md)**.
 
 ---
 
