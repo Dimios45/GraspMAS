@@ -76,7 +76,7 @@ Heavily cluttered scenes with many overlapping objects are the primary failure m
 | Max rounds | 4 |
 | Split | `test`, version `unique` |
 | Sampling | Stratified across object categories (seed=42) |
-| Script | `run_ocidvlg_eval.py` |
+| Script | `scripts/run_ocidvlg_eval.py` |
 
 ---
 

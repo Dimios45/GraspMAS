@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-run_mustard_demo.py  (general YCB object demo)
+scripts/run_mustard_demo.py  (general YCB object demo)
 
 Usage:
-  python run_mustard_demo.py --object-id 077_rubiks_cube --seed 42
-  python run_mustard_demo.py --object-id 003_cracker_box
-  python run_mustard_demo.py                               # defaults to mustard bottle
+  python scripts/run_mustard_demo.py --object-id 077_rubiks_cube --seed 42
+  python scripts/run_mustard_demo.py --object-id 003_cracker_box
+  python scripts/run_mustard_demo.py                               # defaults to mustard bottle
 
 Runs GraspMAS with 4 directional grasp prompts and saves 4 videos.
 AMD headless node: pure Vulkan offscreen, no X display needed.
@@ -45,7 +45,7 @@ from mani_skill.examples.motionplanning.panda.motionplanner import (
 from mani_skill.utils.structs import Pose
 from mani_skill.utils.registration import register_env
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.graspmas import GraspMAS
 from grasp_force import compute_required_force, print_force_report
@@ -196,11 +196,13 @@ for tag, query in PROMPTS:
     # Use GT object position + directional offset for the 3D center; keep
     # only angle θ from GraspMAS (VLM-predicted jaw orientation).
     _, _cx, _cy, w, h, angle = grasp_2d
+    # Approach direction comes from VLM Coder output, not from hardcoded tag.
+    approach_str = graspmas.last_approach
+    print(f"[{tag}] VLM approach: {approach_str}")
 
     obj_u = env.unwrapped
     obj_pos = obj_u._objs[0].pose.p[0].cpu().numpy()
 
-    # Offset grasp center toward the requested face using the object bbox
     mesh   = obj_u._objs[0].get_first_collision_mesh()
     bounds = mesh.bounding_box.bounds         # [[xmin,ymin,zmin],[xmax,ymax,zmax]] local
     hy = (bounds[1, 1] - bounds[0, 1]) / 2 * 0.55
@@ -211,7 +213,7 @@ for tag, query in PROMPTS:
         "bottom": np.array([0,   0, -hz * 0.5]),
         "right":  np.array([0,  hy,  0]),
         "left":   np.array([0, -hy,  0]),
-    }.get(tag, np.zeros(3))
+    }.get(approach_str, np.zeros(3))
     grasp_world = obj_pos + dir_offset
 
     angle_rad   = (angle - 90) * np.pi / 180
@@ -221,7 +223,7 @@ for tag, query in PROMPTS:
         "right":  np.array([0.0, -1.0, -1.0]) / np.sqrt(2),
         "left":   np.array([0.0,  1.0, -1.0]) / np.sqrt(2),
         "bottom": np.array([0.0,  0.0, -1.0]),
-    }.get(tag, np.array([0., 0., -1.]))
+    }.get(approach_str, np.array([0., 0., -1.]))
     # Gram-Schmidt: ensure closing_dir ⊥ approach_dir
     closing_dir = closing_dir - np.dot(closing_dir, approach_dir) * approach_dir
     closing_dir = closing_dir / np.linalg.norm(closing_dir)

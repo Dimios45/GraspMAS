@@ -50,12 +50,12 @@ Mass and friction are read directly from SAPIEN's PhysX actor — no approximati
 
 ---
 
-## Experiment E0 — Raw VLM Baseline (`run_force_benchmark.py`)
+## Experiment E0 — Raw VLM Baseline (`scripts/run_force_benchmark.py`)
 
 Single-turn VLM prompt: show the object image, ask for material / mass / friction / grip force.
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_force_benchmark.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_force_benchmark.py
 ```
 
 **Prompt format:**
@@ -99,14 +99,14 @@ summary.txt            — human-readable table + MAE/MAPE
 
 ---
 
-## Experiment E1 — Material Table (`run_benchmark_e1.py`)
+## Experiment E1 — Material Table (`scripts/run_benchmark_e1.py`)
 
 Improves on E0 with: (1) chain-of-thought prompt with material guide + density anchors,
 (2) table-based friction (VLM classifies material, code looks up realistic μ),
 (3) brittleness-based F_max ceiling to catch crush-risk predictions.
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_benchmark_e1.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_benchmark_e1.py
 ```
 
 Three variants reported side-by-side:
@@ -185,7 +185,7 @@ scatter_e1.png         — 3-panel scatter: GT vs predicted force (E1a / E1b / E
 
 ## Live Force Validation in the Demo
 
-`run_maniskill_demo.py` also validates the actual executed grasp force after `close_gripper()`:
+`scripts/run_maniskill_demo.py` also validates the actual executed grasp force after `close_gripper()`:
 
 ```
 ===== Grasp Force Analysis =====
@@ -209,10 +209,10 @@ This shows the required vs actual contact force and whether the object was lifte
 
 ```bash
 # E0 — raw VLM baseline
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_force_benchmark.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_force_benchmark.py
 
 # E1 — material table experiment
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_benchmark_e1.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_benchmark_e1.py
 
 # Verify ground-truth physics extraction (no GPU needed)
 python -c "

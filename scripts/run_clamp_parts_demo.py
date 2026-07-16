@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_clamp_parts_demo.py
+scripts/run_clamp_parts_demo.py
 Part-based semantic grasping of 050_medium_clamp with 3 prompts:
   - grasp the loop
   - grasp the right handle
@@ -27,7 +27,7 @@ from mani_skill.examples.motionplanning.panda.motionplanner import (
 from mani_skill.utils.structs import Pose
 from mani_skill.utils.registration import register_env
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.graspmas import GraspMAS
 from grasp_force import compute_required_force, print_force_report
@@ -174,33 +174,44 @@ for tag, query in PROMPTS:
     # the gripper closing direction points *toward* the part, so offset slightly
     # along that direction so the fingers are centered on the named part.
     _, _cx, _cy, w, h, angle = grasp_2d
+    # Approach direction comes from VLM Coder output, not from hardcoded tag.
+    approach_str = graspmas.last_approach
+    print(f"  [{tag}] VLM approach: {approach_str}")
+
     obj_u   = env.unwrapped
     obj_pos = obj_u._objs[0].pose.p[0].cpu().numpy()
 
-    # Collision mesh extent for scaling the contact offset
     mesh   = obj_u._objs[0].get_first_collision_mesh()
     bounds = mesh.bounding_box.bounds
     extent_x = (bounds[1, 0] - bounds[0, 0]) / 2 * 0.4
     extent_z = (bounds[1, 2] - bounds[0, 2]) / 2 * 0.4
 
-    # Jaw closing direction (from VLM angle)
     angle_rad   = (angle - 90) * np.pi / 180
     closing_dir = np.array([np.cos(angle_rad), np.sin(angle_rad), 0.0])
 
-    # Part-specific contact offsets (push toward the named part)
+    # Part-specific contact offsets — still based on semantic tag since these
+    # are named parts, not image directions.
     part_offset = {
-        "loop":         np.array([0.0, 0.0, extent_z]),      # loop is at top/end of spring
-        "right_handle": closing_dir * extent_x,               # approach along jaw direction
-        "left_handle":  -closing_dir * extent_x,              # opposite side
+        "loop":         np.array([0.0, 0.0, extent_z]),
+        "right_handle": closing_dir * extent_x,
+        "left_handle":  -closing_dir * extent_x,
     }.get(tag, np.zeros(3))
 
     grasp_world = obj_pos + part_offset
 
+    # Approach direction from VLM; fall back to per-part defaults if VLM says "center".
+    _part_approach_defaults = {
+        "loop":         np.array([0.0,  0.0, -1.0]),
+        "right_handle": np.array([0.0, -1.0, -1.0]) / np.sqrt(2),
+        "left_handle":  np.array([0.0,  1.0, -1.0]) / np.sqrt(2),
+    }
     approach_dir = {
-        "loop":         np.array([ 0.0,  0.0, -1.0]),
-        "right_handle": np.array([-1.0,  0.0, -1.0]) / np.sqrt(2),
-        "left_handle":  np.array([ 1.0,  0.0, -1.0]) / np.sqrt(2),
-    }.get(tag, np.array([0., 0., -1.]))
+        "top":    np.array([0.0,  0.0, -1.0]),
+        "right":  np.array([0.0, -1.0, -1.0]) / np.sqrt(2),
+        "left":   np.array([0.0,  1.0, -1.0]) / np.sqrt(2),
+        "bottom": np.array([0.0,  0.0, -1.0]),
+        "center": _part_approach_defaults.get(tag, np.array([0., 0., -1.])),
+    }.get(approach_str, _part_approach_defaults.get(tag, np.array([0., 0., -1.])))
     # Gram-Schmidt: ensure closing_dir ⊥ approach_dir
     closing_dir = closing_dir - np.dot(closing_dir, approach_dir) * approach_dir
     closing_dir = closing_dir / np.linalg.norm(closing_dir)

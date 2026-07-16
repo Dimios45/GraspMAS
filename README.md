@@ -84,7 +84,7 @@ bash download.sh
 
 **GPU routing** (adjust to your free GPU index):
 ```bash
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python run_maniskill_demo.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python scripts/run_maniskill_demo.py
 ```
 
 ---
@@ -97,13 +97,13 @@ python main_simple.py --query "Grasp the knife at its handle" \
     --image-path path/to/image.png --api-file api.key
 
 # ManiSkill robot demo (reproducible seed)
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_maniskill_demo.py --seed 17
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_maniskill_demo.py --seed 17
 
 # YCB single-object benchmark (74 objects)
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_graspmas_eval.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_graspmas_eval.py
 
 # YCB cluttered benchmark (100 seeds)
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_graspmas_cluttered_eval.py
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_graspmas_cluttered_eval.py
 
 # Mass prediction eval (78 objects, 5-fold CV)
 CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u eval_mass.py
@@ -139,10 +139,10 @@ To customize tools or model hyperparameters refer to **`image_patch.py`**. The G
     <img src="static/robot_exp.jpg" alt="robot experiment" />
 </p>
 
-The script `run_maniskill_demo.py` runs the full GraspMAS pipeline end-to-end in ManiSkill: object detection → grasp prediction → motion planning → robot execution.
+The script `scripts/run_maniskill_demo.py` runs the full GraspMAS pipeline end-to-end in ManiSkill: object detection → grasp prediction → motion planning → robot execution.
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u run_maniskill_demo.py --seed 17
+CUDA_VISIBLE_DEVICES=2 VLM_DEVICE=cuda:0 python -u scripts/run_maniskill_demo.py --seed 17
 ```
 
 ## Pipeline
@@ -318,15 +318,15 @@ Full derivation and ablation (including the X-axis → Y-axis fix) in [docs/DIRE
 ```bash
 # Single object, 4 directions
 CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
-    python run_mustard_demo.py --object-id 024_bowl --seed 42
+    python scripts/run_mustard_demo.py --object-id 024_bowl --seed 42
 
 # Full batch: 49 objects × 4 directions (runs ~11 hours)
 CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
-    nohup python run_all_objects_demo.py --seed 42 > logs/batch.log 2>&1 &
+    nohup python scripts/run_all_objects_demo.py --seed 42 > logs/batch.log 2>&1 &
 
 # Semantic part grasping (medium clamp)
 CUDA_VISIBLE_DEVICES=3 VLM_DEVICE=cuda:0 PYOPENGL_PLATFORM=egl \
-    python run_clamp_parts_demo.py
+    python scripts/run_clamp_parts_demo.py
 ```
 
 ---
@@ -379,8 +379,8 @@ See [docs/MASS_EVAL.md](docs/MASS_EVAL.md) for full analysis, ablation results, 
 
 Physics-aware gripper force estimation: ground-truth simulator physics vs Qwen2-VL visual estimates across all 78 YCB objects.
 
-- **E0 baseline** (`run_force_benchmark.py`) — raw VLM force estimation
-- **E1 experiment** (`run_benchmark_e1.py`) — material classification + lookup table friction (3 variants)
+- **E0 baseline** (`scripts/run_force_benchmark.py`) — raw VLM force estimation
+- **E1 experiment** (`scripts/run_benchmark_e1.py`) — material classification + lookup table friction (3 variants)
 
 See [docs/FORCE_ESTIMATION.md](docs/FORCE_ESTIMATION.md) for methodology and results.
 

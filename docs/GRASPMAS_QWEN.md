@@ -104,7 +104,7 @@ K     = obs['sensor_param']['base_camera']['intrinsic_cv'][0].cpu().numpy()
 
 ![ManiSkill observation](assets/maniskill_observation.png)
 
-**Robot arm executing a grasp** (from `run_maniskill_demo.py`):
+**Robot arm executing a grasp** (from `scripts/run_maniskill_demo.py`):
 
 ![ManiSkill grasp execution](assets/maniskill_grasp.png)
 
@@ -116,23 +116,23 @@ K     = obs['sensor_param']['base_camera']['intrinsic_cv'][0].cpu().numpy()
 
 ### Single demo with ManiSkill
 ```bash
-conda run -n graspmas python run_maniskill_demo.py
+conda run -n graspmas python scripts/run_maniskill_demo.py
 ```
 Outputs timestamped results to `runs/YYYYMMDD_HHMMSS/`.
 
 ### Full evaluation — PickSingleYCB (74 objects)
 ```bash
-conda run -n graspmas --no-capture-output python run_graspmas_eval.py 2>/dev/null | tee runs/eval_single.log
+conda run -n graspmas --no-capture-output python scripts/run_graspmas_eval.py 2>/dev/null | tee runs/eval_single.log
 ```
 
 ### Full evaluation — PickClutterYCB (100 seeds)
 ```bash
-conda run -n graspmas --no-capture-output python run_graspmas_cluttered_eval.py 2>/dev/null | tee runs/eval_cluttered.log
+conda run -n graspmas --no-capture-output python scripts/run_graspmas_cluttered_eval.py 2>/dev/null | tee runs/eval_cluttered.log
 ```
 
 ### Gemini Direct baseline (no GPU, pure HTTP)
 ```bash
-python run_gemini_grasp.py --run_dir runs/20260522_215724_graspmas_single/ --delay 8
+python scripts/run_gemini_grasp.py --run_dir runs/20260522_215724_graspmas_single/ --delay 8
 ```
 Requires `gemini.key` in the project root. Outputs `gemini_results.json` to the run directory.
 
@@ -225,11 +225,11 @@ GraspMAS/
 ├── grasp/                   # GraspNet detection backend
 ├── image_patch.py           # VLM–GraspNet bridge (find, grasp_detection)
 ├── local_vlm.py             # Qwen2-VL-7B inference (AMD ROCm)
-├── run_maniskill_demo.py    # Single demo with ManiSkill execution
-├── run_graspmas_eval.py     # Benchmark: 74 YCB single objects
-├── run_graspmas_cluttered_eval.py  # Benchmark: 100 cluttered seeds
-├── run_ocidvlg_eval.py      # Benchmark: OCID-VLG real-world dataset
-├── run_gemini_grasp.py      # Gemini Direct baseline (no GPU)
+├── scripts/run_maniskill_demo.py    # Single demo with ManiSkill execution
+├── scripts/run_graspmas_eval.py     # Benchmark: 74 YCB single objects
+├── scripts/run_graspmas_cluttered_eval.py  # Benchmark: 100 cluttered seeds
+├── scripts/run_ocidvlg_eval.py      # Benchmark: OCID-VLG real-world dataset
+├── scripts/run_gemini_grasp.py      # Gemini Direct baseline (no GPU)
 └── docs/
     ├── GRASPMAS_QWEN.md     # This file — local Qwen implementation
     └── QWEN_OCIDVLG.md     # OCID-VLG evaluation results

@@ -10,9 +10,13 @@ Ensure your code follow the plan.
 4. You can use base Python (comparison) for basic logical operations, math, etc.
 5. ONLY call methods that exist in the ImagePatch class above. NEVER invent or call functions not listed there. The following DO NOT EXIST and must never be called: adjust_grasp_pose, refine_grasp_pose, find_alternative_grasp_poses, calculate_fragile_overlap_and_collision, get_grasp_poses, filter_grasps, check_collision.
 5b. When the query says "from the top / bottom / left / right", use grasp_detection_directional(patch, direction) with the matching direction string instead of grasp_detection().
-6. grasp_detection() returns List[float] or None — it is NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the grasp_detection() result.
+6. grasp_detection() and grasp_detection_directional() return List[float] or None — NOT an ImagePatch. Never call .overlaps_with() or any ImagePatch method on the result.
 7. ALWAYS null-check after find(): find() returns [None] if nothing found. ALWAYS write: if patches[0] is None: return None — before accessing any attribute on patches[0].
 8. Never call crop() directly. Use find() to locate objects — find() handles cropping internally.
+9. ALWAYS return a dict, never a bare list. Format: {{"grasp": grasp_pose, "approach": direction}}
+   - For grasp_detection_directional(patch, direction): set "approach" to that direction string.
+   - For grasp_detection(patch): set "approach" to "center".
+   - direction must be one of: "top", "bottom", "left", "right", "center".
 
 Provided Python Functions/Class:
 
@@ -400,7 +404,7 @@ def execute_command(image):
     if carrot_patches[0] is None:
         return None
     grasp_pose = image_patch.grasp_detection(carrot_patches[0])
-    return grasp_pose
+    return {"grasp": grasp_pose, "approach": "center"}
     ```
 
 ### Example 2
@@ -418,8 +422,8 @@ def execute_command(image):
         return None
     for bottle_patch in bottle_patches:
         if bottle_patch.verify_property("bottle", "blue and red"):
-                grasp_pose = image_patch.grasp_detection(bottle_patch)
-                return grasp_pose
+            grasp_pose = image_patch.grasp_detection(bottle_patch)
+            return {"grasp": grasp_pose, "approach": "center"}
     return None
     ```
 
@@ -437,7 +441,7 @@ def execute_command(image):
         return None
     bar_patches.sort(key=lambda x: x.horizontal_center)
     grasp_pose = image_patch.grasp_detection(bar_patches[1])
-    return grasp_pose
+    return {"grasp": grasp_pose, "approach": "center"}
     ```
 
 ### Example 4
@@ -454,7 +458,7 @@ def execute_command(image):
         return None
     apple_patches.sort(key=lambda x: x.vertical_center)
     grasp_pose = image_patch.grasp_detection(apple_patches[-1])
-    return grasp_pose
+    return {"grasp": grasp_pose, "approach": "center"}
     ```
 
 ### Example 5
@@ -470,7 +474,7 @@ def execute_command(image):
         return None
     knife_blade_patch = knife_patches[0].find_part("knife", "blade")
     grasp_pose = image_patch.grasp_detection(knife_blade_patch)
-    return grasp_pose
+    return {"grasp": grasp_pose, "approach": "center"}
     ```
 
 ### Example 6
@@ -481,34 +485,6 @@ def execute_command(image):
     image_patch = ImagePatch(image)
     kleenex_info = image_patch.llm_query("What is the color of the Kleenex package in the image?")
     return kleenex_info
-    ```
-
-### Example 8
-Plan:
-Step 1: Find the banana in the image.
-Step 2: Detect a grasp on the left side of the banana.
-A: ```
-def execute_command(image):
-    image_patch = ImagePatch(image)
-    patches = image_patch.find("banana")
-    if patches[0] is None:
-        return None
-    grasp_pose = image_patch.grasp_detection_directional(patches[0], "left")
-    return grasp_pose
-    ```
-
-### Example 9
-Plan:
-Step 1: Find the bottle in the image.
-Step 2: Grasp the bottle from the top.
-A: ```
-def execute_command(image):
-    image_patch = ImagePatch(image)
-    patches = image_patch.find("bottle")
-    if patches[0] is None:
-        return None
-    grasp_pose = image_patch.grasp_detection_directional(patches[0], "top")
-    return grasp_pose
     ```
 
 ### Example 7
@@ -531,6 +507,48 @@ def execute_command(image):
     valid_balls.sort(key=lambda p: abs(p.horizontal_center - mug.horizontal_center) +
                                    abs(p.vertical_center - mug.vertical_center))
     grasp_pose = image_patch.grasp_detection(valid_balls[0])
-    return grasp_pose
+    return {"grasp": grasp_pose, "approach": "center"}
+    ```
+
+### Example 8
+Plan:
+Step 1: Find the banana in the image.
+Step 2: Detect a grasp on the left side of the banana.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    patches = image_patch.find("banana")
+    if patches[0] is None:
+        return None
+    grasp_pose = image_patch.grasp_detection_directional(patches[0], "left")
+    return {"grasp": grasp_pose, "approach": "left"}
+    ```
+
+### Example 9
+Plan:
+Step 1: Find the bottle in the image.
+Step 2: Grasp the bottle from the top.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    patches = image_patch.find("bottle")
+    if patches[0] is None:
+        return None
+    grasp_pose = image_patch.grasp_detection_directional(patches[0], "top")
+    return {"grasp": grasp_pose, "approach": "top"}
+    ```
+
+### Example 10
+Plan:
+Step 1: Find the mug in the image.
+Step 2: Grasp the mug from the right side.
+A: ```
+def execute_command(image):
+    image_patch = ImagePatch(image)
+    patches = image_patch.find("mug")
+    if patches[0] is None:
+        return None
+    grasp_pose = image_patch.grasp_detection_directional(patches[0], "right")
+    return {"grasp": grasp_pose, "approach": "right"}
     ```
 '''

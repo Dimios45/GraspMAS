@@ -76,7 +76,7 @@ Wraps `detect_grasp_directional` with the same resize / coordinate-rescale logic
 
 ### 4. 2D → 6-DoF Pose Construction
 
-**File:** `run_all_objects_demo.py` (and `run_mustard_demo.py`)
+**File:** `scripts/run_all_objects_demo.py` (and `scripts/run_mustard_demo.py`)
 
 The 2D grasp rectangle `(q, cx, cy, w, h, θ)` is projected to a full 6-DoF `sapien.Pose`:
 
@@ -206,7 +206,7 @@ Round, symmetric objects succeed from all directions. The orange is one of 4 per
 For objects with named parts, `find_part(object, part)` (backed by VLPart) localises a sub-region mask. The same 6-DoF pipeline applies:
 
 ```python
-# run_clamp_parts_demo.py
+# scripts/run_clamp_parts_demo.py
 prompts = [
     ("loop",         "Pick the medium clamp up by grasping the loop"),
     ("right_handle", "Pick the medium clamp up by grasping the right handle"),
@@ -285,7 +285,7 @@ The original mapping used ±X for left/right. Because the robot sits at X = −0
 
 ---
 
-## Semantic Part Grasping (`run_clamp_parts_demo.py`)
+## Semantic Part Grasping (`scripts/run_clamp_parts_demo.py`)
 
 For objects with named parts, `find_part(object, part)` (backed by VLPart) locates a sub-region mask. The same 6-DoF pipeline applies with part-specific approach directions.
 
@@ -319,8 +319,8 @@ See [README.md — Future Work](../README.md#future-work) for the full list. The
 
 | Script | Purpose |
 |--------|---------|
-| `run_mustard_demo.py` | 4-direction demo for any single YCB object (`--object-id`) |
-| `run_all_objects_demo.py` | Full batch: 49 objects × 4 directions with crash safety + resume |
-| `run_clamp_parts_demo.py` | 3 semantic-part prompts on `050_medium_clamp` |
+| `scripts/run_mustard_demo.py` | 4-direction demo for any single YCB object (`--object-id`) |
+| `scripts/run_all_objects_demo.py` | Full batch: 49 objects × 4 directions with crash safety + resume |
+| `scripts/run_clamp_parts_demo.py` | 3 semantic-part prompts on `050_medium_clamp` |
 
 See [SCRIPTS.md](../SCRIPTS.md) for CLI flags and output layout.

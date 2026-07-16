@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-run_all_objects_demo.py
+scripts/run_all_objects_demo.py
 Run GraspMAS 4-direction demo for all 49 VALID YCB objects in one process.
 VLMs and perception models are loaded once; each object gets its own sub-folder
 under  object_demo/all_<timestamp>/
 
 Usage:
-  CUDA_VISIBLE_DEVICES=0 VLM_DEVICE=cuda:0 python run_all_objects_demo.py [--seed 42]
+  CUDA_VISIBLE_DEVICES=0 VLM_DEVICE=cuda:0 python scripts/run_all_objects_demo.py [--seed 42]
 """
 
 import argparse, os, sys, asyncio, warnings, json, time
@@ -36,7 +36,7 @@ from mani_skill.examples.motionplanning.panda.motionplanner import (
 from mani_skill.utils.structs import Pose
 from mani_skill.utils.registration import register_env
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.graspmas import GraspMAS
 from grasp_force import compute_required_force, print_force_report
@@ -254,8 +254,13 @@ for obj_idx, obj_id in enumerate(VALID_OBJECTS):
             _save_results(out_dir, all_results)
             continue
 
-        # 2D → 6DoF: GT position + directional offset + VLM jaw angle
+        # 2D → 6DoF: GT position + VLM-chosen approach direction + jaw angle
         _, _cx, _cy, w, h, angle = grasp_2d
+        # Approach direction comes from the VLM Coder (graspmas.last_approach),
+        # not from the hardcoded tag — this is the key Option B change.
+        approach_str = graspmas.last_approach
+        print(f"  [{tag}] VLM approach: {approach_str}")
+
         obj_u   = env.unwrapped
         obj_pos = obj_u._objs[0].pose.p[0].cpu().numpy()
 
@@ -264,13 +269,12 @@ for obj_idx, obj_id in enumerate(VALID_OBJECTS):
         hy = (bounds[1, 1] - bounds[0, 1]) / 2 * 0.55
         hz = (bounds[1, 2] - bounds[0, 2]) / 2 * 0.55
         # Camera looks in -X direction → camera-right = world +Y, camera-left = world -Y.
-        # "bottom" targets the lower bbox half but still approaches top-down (table blocks below).
         dir_offset = {
             "top":    np.array([0,   0,  hz]),
             "bottom": np.array([0,   0, -hz * 0.5]),
             "right":  np.array([0,  hy,  0]),
             "left":   np.array([0, -hy,  0]),
-        }.get(tag, np.zeros(3))
+        }.get(approach_str, np.zeros(3))
 
         angle_rad   = (angle - 90) * np.pi / 180
         closing_dir = np.array([np.cos(angle_rad), np.sin(angle_rad), 0.0])
@@ -279,7 +283,7 @@ for obj_idx, obj_id in enumerate(VALID_OBJECTS):
             "right":  np.array([0.0, -1.0, -1.0]) / np.sqrt(2),
             "left":   np.array([0.0,  1.0, -1.0]) / np.sqrt(2),
             "bottom": np.array([0.0,  0.0, -1.0]),
-        }.get(tag, np.array([0., 0., -1.]))
+        }.get(approach_str, np.array([0., 0., -1.]))
         # Gram-Schmidt: ensure closing_dir ⊥ approach_dir
         closing_dir = closing_dir - np.dot(closing_dir, approach_dir) * approach_dir
         closing_dir = closing_dir / np.linalg.norm(closing_dir)

@@ -12,7 +12,7 @@ Comparison baseline:
   GraspMAS (GPT-4o): 0.62 success rate on OCID-VLG (Table II of paper)
 
 Usage:
-  python run_ocidvlg_eval.py --root /path/to/ocid-vlg --n 100
+  python scripts/run_ocidvlg_eval.py --root /path/to/ocid-vlg --n 100
 
 Output: runs/YYYYMMDD_HHMMSS_ocidvlg_eval/
   results.json, results.csv, summary.txt, imgs/<idx>/
@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 warnings.filterwarnings('ignore')
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.graspmas import GraspMAS
 

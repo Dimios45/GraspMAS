@@ -18,7 +18,7 @@ from mani_skill.utils.wrappers.record import RecordEpisode
 from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 from mani_skill.utils.structs import Actor, Pose
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.graspmas import GraspMAS
 from grasp_force import get_object_physics, compute_required_force, get_contact_forces, print_force_report
 

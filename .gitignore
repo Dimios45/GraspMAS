@@ -17,6 +17,9 @@ dataset/
 gradio_demo/
 runs/
 out/
+logs/
+mustard_demo/
+object_demo/
 detectron2/detectron2/layers/csrc/**/*.hip
 detectron2/detectron2/layers/csrc/**/*_hip.cpp
 detectron2/detectron2/layers/csrc/**/*_hip.h

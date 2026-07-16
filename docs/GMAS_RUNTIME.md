@@ -211,6 +211,30 @@ Attribution is clean:
 gmas wins on success at **every individual seed** (16 > 13, 18 > 17,
 15 > 12) and dominates every efficiency metric with lower variance.
 
+## 49-YCB detection stage — legacy vs all-on, seed 42
+
+4-direction prompts × 49 objects = 196 queries per arm, byte-identical
+cached ManiSkill renders (`gmas/eval/run_ycb_ab.py`; detection stage only —
+the sim lift check remains in `scripts/run_all_objects_demo.py`).
+
+| metric | legacy | gmas all-on |
+|---|---|---|
+| detection rate | 85.2% | **100%** |
+| approach-direction correct | 81.6% | **94.9%** |
+| query-level errors (aborts) | 29 | **0** |
+| median t /q | 13.6 s | **9.5 s (−30%)** |
+| LLM calls /q | 3.75 | **2.22 (−41%)** |
+| rounds /q | 1.87 | **1.02** |
+
+On this cleaner single-object benchmark (no clutter → perception is not the
+bottleneck) the runtime's advantage is unambiguous: every one of the 29
+legacy aborts is recovered, every query yields a grasp, and 95% match the
+prompted approach direction — at 60% of the LLM cost and nearly always in a
+single round.
+
+Note on thresholds: `gate_q = 0.85` is the a-priori default; it was never
+tuned on any evaluation data (a held-out dev-split sweep is future work).
+
 ## Deferred roadmap
 
 PCA/point-cloud 6-DoF, gripper-agnostic + dexterous grasping, semantic force

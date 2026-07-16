@@ -7,14 +7,14 @@ Gemini 2.5 Flash and asks it to predict a parallel-jaw grasp in pixel coords.
 No GraspNet, no GroundingDINO, no SAM, no LLM planning loop.
 Single API call per image — pure vision-LLM baseline.
 
-Can be run on any image saved by run_graspmas_eval.py or run_ocidvlg_eval.py.
+Can be run on any image saved by scripts/run_graspmas_eval.py or scripts/run_ocidvlg_eval.py.
 
 Usage:
   # Single image:
-  python run_gemini_grasp.py --image runs/.../imgs/011_banana/input.png --object banana
+  python scripts/run_gemini_grasp.py --image runs/.../imgs/011_banana/input.png --object banana
 
   # Batch over a full graspmas eval run (reads all input.png files):
-  python run_gemini_grasp.py --run_dir runs/20260522_215724_graspmas_single/
+  python scripts/run_gemini_grasp.py --run_dir runs/20260522_215724_graspmas_single/
 
 Output: gemini_results.json in the run directory (batch) or stdout (single).
 """

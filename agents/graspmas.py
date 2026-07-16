@@ -33,6 +33,7 @@ class GraspMAS:
         self.observation = None
         self.code = None
         self.max_round = max_round
+        self.last_approach: str = "center"  # set by query() from Coder output
 
     @staticmethod
     def _prepare_image(
@@ -93,9 +94,20 @@ class GraspMAS:
             exec(self.code, globals())
             try:
                 out_raw = execute_command(img_np)
-                grasp_pose = out_raw.copy() if isinstance(out_raw, list) else None
+                # Coder may return a dict {"grasp": [...], "approach": "right"}
+                # or a plain list (legacy format) — handle both.
+                if isinstance(out_raw, dict):
+                    grasp_list = out_raw.get("grasp")
+                    self.last_approach = out_raw.get("approach", "center")
+                elif isinstance(out_raw, list):
+                    grasp_list = out_raw
+                    self.last_approach = "center"
+                else:
+                    grasp_list = None
+                grasp_pose = grasp_list.copy() if isinstance(grasp_list, list) else None
             except Exception as e:
                 out_raw = str(e)
+                grasp_list = None
                 print("Error:", out_raw)
 
             result = {
@@ -103,17 +115,16 @@ class GraspMAS:
                 "image": str(image_path),
                 "error_logs": None,
             }
-            
+
             # Visualization
-            if isinstance(out_raw, list):
-                result["grasp"] = out_raw
-                grasp_pose = out_raw.copy()
-                # save visualization
-                vis_path = visualize_grasp_pose(img_np, out_raw, save_folder)
+            if isinstance(grasp_list, list):
+                result["grasp"] = grasp_list
+                grasp_pose = grasp_list.copy()
+                vis_path = visualize_grasp_pose(img_np, grasp_list, save_folder)
                 print("Grasp Pose Visualization saved at:", vis_path)
                 result["image"] = str(vis_path)
             else:
-                result["error_logs"] = out_raw
+                result["error_logs"] = out_raw if isinstance(out_raw, str) else str(out_raw)
             print("----- Execution Result -----\n", result)
             # Observer
             observation = await self.observer(result, query)
